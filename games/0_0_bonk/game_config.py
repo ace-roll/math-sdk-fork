@@ -1,96 +1,127 @@
-"""Template game configuration file, detailing required user-specified inputs."""
+"""Configuration for Bonk Boi game."""
 
 from src.config.config import Config
+from src.config.betmode import BetMode
 from src.config.distributions import Distribution
-from src.config.config import BetMode
+import os
 
 
 class GameConfig(Config):
-    """Template configuration class."""
+    """Configuration for Bonk Boi multiplier slot game."""
 
     def __init__(self):
         super().__init__()
-        self.game_id = ""
-        self.provider_numer = 0
-        self.working_name = ""
-        self.wincap = 0
-        self.win_type = ""
-        self.rtp = 0
-        self.construct_paths()
-
-        # Game Dimensions
-        self.num_reels = 0
-        self.num_rows = [0] * self.num_reels  # Optionally include variable number of rows per reel
-        # Board and Symbol Properties
-        self.paytable = {}
-
-        self.include_padding = True
-        self.special_symbols = {"wild": [], "scatter": [], "multiplier": []}
-
-        self.freespin_triggers = {self.basegame_type: {}, self.freegame_type: {}}
-        self.anticipation_triggers = {self.basegame_type: 0, self.freegame_type: 0}
-        # Reels
-        reels = {"BR0": "BR0.csv", "FR0": "FR0.csv"}
-        self.reels = {}
-        for r, f in reels.items():
-            self.reels[r] = self.read_reels_csv(str.join("/", [self.reels_path, f]))
-
+        
+        # Game ID must be in format: provider_gameNumber_rtp
+        self.game_id = "0_0_bonk"  # 96% RTP target
+        
+        # Game type
+        self.basegame_type = "base"
+        self.freegame_type = "free"
+        
+        # Board configuration
+        self.num_reels = 2
+        self.num_rows = [1, 1]  # 1 row per reel
+        
+        # Win cap - максимальний виграш 5000x
+        self.wincap = 5000.0
+        
+        # Paytable - multiplier values (правильні мультиплікатори)
+        self.paytable = {
+            (1, "1"): 1,
+            (1, "2"): 2,
+            (1, "3"): 3,
+            (1, "5"): 5,
+            (1, "10"): 10,
+            (1, "25"): 25,
+            (1, "50"): 50,
+            (1, "100"): 100,
+            (1, "250"): 250,
+            (1, "500"): 500,
+            (1, "1000"): 1000,
+        }
+        
+        # Special symbols
+        self.special_symbols = {
+            "bonus": ["Bat", "Golden Bat"],
+            "scatter": []  # No scatter symbols in this game, but needed to prevent KeyError
+        }
+        
+        # Reel strips
+        self.reel_strips = {
+            "base": {
+                "reels": ["games/0_0_bonk/reels/BR0.csv", "games/0_0_bonk/reels/BR0.csv"]
+            }
+        }
+        
+        # Bet modes
         self.bet_modes = [
             BetMode(
                 name="base",
                 cost=1.0,
-                rtp=self.rtp,
-                max_win=self.wincap,
+                rtp=0.96,
+                max_win=5000.0,  # Максимальний виграш 5000x
                 auto_close_disabled=False,
-                is_feature=True,
+                is_feature=False,
                 is_buybonus=False,
                 distributions=[
                     Distribution(
-                        criteria="wincap",
-                        quota=0.001,
-                        win_criteria=self.wincap,
-                        conditions={
-                            "reel_weights": {
-                                self.basegame_type: {"BR0": 1},
-                                self.freegame_type: {"FR0": 1},
-                            },
-                            "scatter_triggers": {},
-                            "force_wincap": True,
-                            "force_freegame": True,
-                        },
-                    ),
-                    Distribution(
-                        criteria="freegame",
-                        quota=0.1,
-                        conditions={
-                            "reel_weights": {
-                                self.basegame_type: {"BR0": 1},
-                                self.freegame_type: {"FR0": 1},
-                            },
-                            "scatter_triggers": {},
-                            "force_wincap": False,
-                            "force_freegame": True,
-                        },
-                    ),
-                    Distribution(
                         criteria="0",
-                        quota=0.4,
-                        win_criteria=0.0,
+                        quota=1,
+                        win_criteria=None,
                         conditions={
                             "reel_weights": {self.basegame_type: {"BR0": 1}},
                             "force_wincap": False,
                             "force_freegame": False,
-                        },
-                    ),
-                    Distribution(
-                        criteria="basegame",
-                        quota=0.5,
-                        conditions={
-                            "reel_weights": {self.basegame_type: {"BR0": 1}},
-                            "force_wincap": False,
-                            "force_freegame": False,
-                        },
-                    ),
-                ],
-            ),
+                        }
+                    )
+                ]
+            )
         ]
+        
+        # Optimization parameters (not needed for this simple game)
+        self.optimization_params = None
+        
+        # Event list writing
+        self.write_event_list = True
+
+        self.provider_numer = 0
+        self.working_name = "Bonk Boi"
+        self.win_type = "multiplier"
+        self.rtp = 0.96  # RTP 96%
+        
+        self.construct_paths()
+
+        # Game Dimensions
+
+        # Board and Symbol Properties
+
+        self.include_padding = True
+        self.freespin_triggers = {self.basegame_type: {999: 0}, self.freegame_type: {999: 0}}  # Dummy high value to never trigger
+        self.anticipation_triggers = {self.basegame_type: 0, self.freegame_type: 0}
+
+        # Load reel strips using custom method for single-column format
+        self.reels = {}
+        
+        # Load the base reel data - BR0.csv has one symbol per line
+        base_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BR0.csv")
+        base_reel_symbols = self.read_single_column_csv(base_reel_path)
+        
+        # Create proper reels structure for 2-reel game
+        # BR0 should be a list where each element is a list of symbols for one reel
+        self.reels["BR0"] = [base_reel_symbols, base_reel_symbols]  # 2 reels, both using same symbols
+
+        # Set up padding reels for standard system - use proper format
+        self.padding_reels = {}
+        self.padding_reels[self.basegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels
+        self.padding_reels[self.freegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels
+
+    def read_single_column_csv(self, file_path):
+        """Read single column CSV file (one symbol per line)"""
+        symbols = []
+        with open(file_path, 'r', encoding='UTF-8') as file:
+            for line in file:
+                symbol = line.strip()
+                if symbol:  # Skip empty lines
+                    symbols.append(symbol)
+        return symbols
