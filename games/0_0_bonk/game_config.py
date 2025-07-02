@@ -1,4 +1,4 @@
-"""Configuration for Bonk Boi game."""
+"""Configuration for Bonk Boi game with bonus games."""
 
 from src.config.config import Config
 from src.config.betmode import BetMode
@@ -7,7 +7,7 @@ import os
 
 
 class GameConfig(Config):
-    """Configuration for Bonk Boi multiplier slot game."""
+    """Configuration for Bonk Boi multiplier slot game with bonus games."""
 
     def __init__(self):
         super().__init__()
@@ -47,10 +47,16 @@ class GameConfig(Config):
             "scatter": []  # No scatter symbols in this game, but needed to prevent KeyError
         }
         
-        # Reel strips
+        # Reel strips - now supporting BR0, BON1, and BON2
         self.reel_strips = {
             "base": {
                 "reels": ["games/0_0_bonk/reels/BR0.csv", "games/0_0_bonk/reels/BR0.csv"]
+            },
+            "bonus1": {
+                "reels": ["games/0_0_bonk/reels/BON1.csv", "games/0_0_bonk/reels/BON1.csv"]
+            },
+            "bonus2": {
+                "reels": ["games/0_0_bonk/reels/BON2.csv", "games/0_0_bonk/reels/BON2.csv"]
             }
         }
         
@@ -71,6 +77,48 @@ class GameConfig(Config):
                         win_criteria=None,
                         conditions={
                             "reel_weights": {self.basegame_type: {"BR0": 1}},
+                            "force_wincap": False,
+                            "force_freegame": False,
+                        }
+                    )
+                ]
+            ),
+            BetMode(
+                name="bonus1",
+                cost=1.0,
+                rtp=0.96,
+                max_win=5000.0,
+                auto_close_disabled=False,
+                is_feature=True,
+                is_buybonus=False,
+                distributions=[
+                    Distribution(
+                        criteria="0",
+                        quota=1,
+                        win_criteria=None,
+                        conditions={
+                            "reel_weights": {self.basegame_type: {"BON1": 1}},
+                            "force_wincap": False,
+                            "force_freegame": False,
+                        }
+                    )
+                ]
+            ),
+            BetMode(
+                name="bonus2",
+                cost=1.0,
+                rtp=0.96,
+                max_win=5000.0,
+                auto_close_disabled=False,
+                is_feature=True,
+                is_buybonus=False,
+                distributions=[
+                    Distribution(
+                        criteria="0",
+                        quota=1,
+                        win_criteria=None,
+                        conditions={
+                            "reel_weights": {self.basegame_type: {"BON2": 1}},
                             "force_wincap": False,
                             "force_freegame": False,
                         }
@@ -103,18 +151,29 @@ class GameConfig(Config):
         # Load reel strips using custom method for single-column format
         self.reels = {}
         
-        # Load the base reel data - BR0.csv has one symbol per line
+        # Load all reel data files
         base_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BR0.csv")
+        bonus1_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON1.csv")
+        bonus2_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON2.csv")
+        
         base_reel_symbols = self.read_single_column_csv(base_reel_path)
+        bonus1_reel_symbols = self.read_single_column_csv(bonus1_reel_path)
+        bonus2_reel_symbols = self.read_single_column_csv(bonus2_reel_path)
         
         # Create proper reels structure for 2-reel game
-        # BR0 should be a list where each element is a list of symbols for one reel
+        # BR0 for base game (with Bat bonuses)
         self.reels["BR0"] = [base_reel_symbols, base_reel_symbols]  # 2 reels, both using same symbols
+        
+        # BON1 for first bonus game (Bat: 50, Golden Bat: 10)
+        self.reels["BON1"] = [bonus1_reel_symbols, bonus1_reel_symbols]  # 2 reels, both using same symbols
+        
+        # BON2 for second bonus game (Bat: 0, Golden Bat: 10)
+        self.reels["BON2"] = [bonus2_reel_symbols, bonus2_reel_symbols]  # 2 reels, both using same symbols
 
         # Set up padding reels for standard system - use proper format
         self.padding_reels = {}
-        self.padding_reels[self.basegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels
-        self.padding_reels[self.freegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels
+        self.padding_reels[self.basegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels with BR0
+        self.padding_reels[self.freegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels with BR0 (fallback)
 
     def read_single_column_csv(self, file_path):
         """Read single column CSV file (one symbol per line)"""
