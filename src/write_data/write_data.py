@@ -7,7 +7,12 @@ import os
 import hashlib
 import json
 import ast
-import zstandard as zstd
+# Conditional import for zstandard
+try:
+    import zstandard as zstd
+    ZSTD_AVAILABLE = True
+except ImportError:
+    ZSTD_AVAILABLE = False
 
 
 def get_sha_256(file_to_hash: str):
@@ -143,7 +148,7 @@ def output_lookup_and_force_files(
                 gamestate.output_files.get_temp_multi_thread_name(betmode, thread, repeat_index, compress)
             )
 
-    if compress:
+    if compress and ZSTD_AVAILABLE:
         # Write a temporary file
         temp_book_output_path = os.path.join(gamestate.output_files.book_path, "temp_book_output.json")
         with open(temp_book_output_path, "w", encoding="UTF-8") as outfile:
@@ -157,6 +162,16 @@ def output_lookup_and_force_files(
             f_out.write(zstd.ZstdCompressor().compress(f_in.read()))
 
         os.remove(temp_book_output_path)
+    elif compress and not ZSTD_AVAILABLE:
+        print("Warning: zstandard not available, falling back to uncompressed output")
+        with open(
+            gamestate.output_files.get_final_book_name(betmode, False),
+            "w",
+            encoding="UTF-8",
+        ) as outfile:
+            for filename in file_list:
+                with open(filename, "r", encoding="UTF-8") as infile:
+                    outfile.write(infile.read())
     else:
         with open(
             gamestate.output_files.get_final_book_name(betmode, False),
