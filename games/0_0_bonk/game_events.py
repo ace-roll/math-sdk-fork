@@ -25,39 +25,46 @@ class BonkBoiEvents:
         """Set the current reel set (BR0, BON1, or BON2)"""
         self.current_reel_set = reel_set
 
-    def trigger_bonus(self, bonus_type):
+    def trigger_bonus(self, bonus_type, spins_count=None):
         """Trigger bonus mode based on bonus type"""
         if bonus_type == "BONK_SPINS":
             self.bonus_mode = True
-            self.bonus_spins_left = 10
-            self.bonus_state = self.trigger_bonus_game("BONK_SPINS")
+            self.bonus_spins_left = spins_count if spins_count else 10
+            self.bonus_state = self.trigger_bonus_game("BONK_SPINS", self.bonus_spins_left)
             # Switch to BON1 reels for first bonus game (Bat: 50, Golden Bat: 10)
             self.set_reel_set("BON1")
         elif bonus_type == "SUPER_BONK_SPINS":
             self.super_bonus_mode = True
-            self.bonus_spins_left = 15
+            self.bonus_spins_left = spins_count if spins_count else 10
             self.sticky_multiplier = 2
-            self.bonus_state = self.trigger_bonus_game("SUPER_BONK_SPINS")
+            self.bonus_state = self.trigger_bonus_game("SUPER_BONK_SPINS", self.bonus_spins_left)
             # Switch to BON2 reels for second bonus game (Bat: 0, Golden Bat: 10)
             self.set_reel_set("BON2")
+        
+        # Reset bonus session tracking
+        self.bonus_session_id = None
+        self.bonus_spins_completed = 0
+        self.total_bonus_win = 0
 
-    def trigger_bonus_game(self, bonus_type: str) -> dict:
+    def trigger_bonus_game(self, bonus_type: str, spins_left: int) -> dict:
         """Initialize bonus game state"""
         if bonus_type == "BONK_SPINS":
             return {
                 "type": "BONK_SPINS",
-                "spins_left": 10,
+                "spins_left": spins_left,
                 "multiplier": 1,
                 "total_win": 0,
-                "symbols_collected": []
+                "symbols_collected": [],
+                "upgraded_from_bonk": False
             }
         elif bonus_type == "SUPER_BONK_SPINS":
             return {
                 "type": "SUPER_BONK_SPINS",
-                "spins_left": 15,
+                "spins_left": spins_left,
                 "multiplier": 2,
                 "total_win": 0,
-                "symbols_collected": []
+                "symbols_collected": [],
+                "upgraded_from_bonk": False
             }
         else:
             return {
@@ -65,44 +72,51 @@ class BonkBoiEvents:
                 "spins_left": 0,
                 "multiplier": 1,
                 "total_win": 0,
-                "symbols_collected": []
+                "symbols_collected": [],
+                "upgraded_from_bonk": False
             }
 
     def process_spin(self, reels):
         """Process a spin with given reel symbols"""
+        print(f"DEBUG: process_spin START - called with reels: {reels}")
+        
         if len(reels) != 2:
+            print(f"DEBUG: process_spin - Invalid reels length: {len(reels)}, returning 0, None")
             return 0, None
         
         symbol1, symbol2 = reels
+        print(f"DEBUG: process_spin - Symbols: {symbol1}, {symbol2}")
         
-        # Check for bonus symbols first
-        if symbol1 in ["Bat", "Golden Bat"] or symbol2 in ["Bat", "Golden Bat"]:
-            # Determine bonus type based on symbols and current reel set
-            if "Golden Bat" in [symbol1, symbol2]:
+        # Count bonus symbols
+        bonus_count = sum(1 for symbol in reels if symbol == "Bat")
+        super_bonus_count = sum(1 for symbol in reels if symbol == "Golden Bat")
+        print(f"DEBUG: process_spin - Bonus count: {bonus_count}, Super bonus count: {super_bonus_count}")
+        
+        # If we have bonus symbols, trigger bonus
+        if bonus_count > 0 or super_bonus_count > 0:
+            if super_bonus_count > 0:
                 bonus_type = "SUPER_BONK_SPINS"
-            elif "Bat" in [symbol1, symbol2] and self.current_reel_set == "BR0":
-                # Only trigger Bat bonus in base game (BR0)
-                bonus_type = "BONK_SPINS"
             else:
-                # No bonus trigger in bonus reels for Bat symbols
-                return 0, None
+                bonus_type = "BONK_SPINS"
+            print(f"DEBUG: process_spin - Bonus triggered: {bonus_type}")
             return 0, bonus_type
         
-        # Regular multiplier calculation
+        # Check if both symbols are "1" - this should return 0 win, no bonus
+        if symbol1 == "1" and symbol2 == "1":
+            print(f"DEBUG: process_spin - Both symbols are '1', returning 0, None")
+            print(f"DEBUG: process_spin - symbol1 type: {type(symbol1)}, value: '{symbol1}'")
+            print(f"DEBUG: process_spin - symbol2 type: {type(symbol2)}, value: '{symbol2}'")
+            return 0, None
+        
+        # Calculate win by multiplying symbols
         try:
             mult1 = int(symbol1)
             mult2 = int(symbol2)
-            
-            # Rule: if both symbols are "1", result is 0 (1x1=0)
-            if mult1 == 1 and mult2 == 1:
-                return 0, None
-            
-            # Calculate win: multiply the two symbols
             win = mult1 * mult2
+            print(f"DEBUG: process_spin - Calculated win: {mult1} * {mult2} = {win}")
             return win, None
-            
         except ValueError:
-            # If symbols can't be converted to integers, return 0
+            print(f"DEBUG: process_spin - ValueError converting symbols to int: {symbol1}, {symbol2}")
             return 0, None
 
     def process_bonus_spin(self, reels):
@@ -113,13 +127,16 @@ class BonkBoiEvents:
                 # Store previous total win
                 previous_total = self.bonus_state["total_win"]
                 
-                # Process through bonus game
-                self.bonus_state = self.process_bonus_spin_logic(self.bonus_state, reels)
+                # Check if this is buy_bonk_spins mode (using BR0 reels with base game logic)
+                if self.current_reel_set == "BR0" and self.bonus_state["type"] == "BONK_SPINS":
+                    # Use base game logic for buy_bonk_spins mode
+                    spin_win = self.calculate_base_game_win(reels)
+                else:
+                    # Use regular bonus game logic
+                    self.bonus_state = self.process_bonus_spin_logic(self.bonus_state, reels, self.bonus_state["type"])
+                    spin_win = self.bonus_state["total_win"] - previous_total
                 
-                # Calculate this spin's win
-                spin_win = self.bonus_state["total_win"] - previous_total
                 self.last_spin_win = spin_win
-                
                 return spin_win, None
             else:
                 # Fallback to old logic
@@ -136,22 +153,182 @@ class BonkBoiEvents:
                 return final_win, bonus
             return base_win, bonus
 
-    def process_bonus_spin_logic(self, bonus_state: dict, reel_symbols: list) -> dict:
-        """Process a single bonus spin with bonus game logic"""
-        if bonus_state["spins_left"] <= 0:
-            return bonus_state
+    def process_bonus_spin_logic(self, bonus_state: dict, reel_symbols: list, bonus_type: str) -> dict:
+        """Process bonus spin logic for both BONK_SPINS and SUPER_BONK_SPINS"""
+        print(f"DEBUG: process_bonus_spin_logic - bonus_type: {bonus_type}, current total_win: {bonus_state['total_win']}")
         
-        bonus_type = bonus_state["type"]
-        spin_multiplier = self.calculate_bonus_win(reel_symbols, bonus_type)
-        final_multiplier = spin_multiplier * bonus_state["multiplier"]
-        bonus_state["total_win"] += final_multiplier
+        if bonus_type == "SUPER_BONK_SPINS":
+            return self.process_super_bonk_spin(bonus_state, reel_symbols)
+        else:
+            return self.process_bonk_spin(bonus_state, reel_symbols)
+
+    def process_bonk_spin(self, bonus_state: dict, reel_symbols: list) -> dict:
+        """Process BONK_SPINS logic"""
+        # Calculate win using bonus spin rules
+        def get_symbol_value(symbol):
+            if symbol in ["Bat", "Golden Bat"]:
+                return 1
+            elif symbol in ["1", "2", "3", "5", "10", "25", "50", "100", "250", "500", "1000"]:
+                return int(symbol)
+            else:
+                return 0
+        
+        mult1 = get_symbol_value(reel_symbols[0]) if len(reel_symbols) > 0 else 0
+        mult2 = get_symbol_value(reel_symbols[1]) if len(reel_symbols) > 1 else 0
+        
+        print(f"DEBUG: process_bonk_spin - reel_symbols: {reel_symbols}, mult1: {mult1}, mult2: {mult2}")
+        
+        # Apply 1x1=0 rule ONLY when both values are exactly 1
+        if mult1 == 1 and mult2 == 1:
+            spin_win = 0
+        else:
+            spin_win = mult1 * mult2
+        
+        print(f"DEBUG: process_bonk_spin - calculated spin_win: {spin_win}")
+        
+        # Add to total win
+        old_total_win = bonus_state["total_win"]
+        bonus_state["total_win"] += spin_win
+        print(f"DEBUG: BONK_SPINS: spin_win = {spin_win}, total_win: {old_total_win} + {spin_win} = {bonus_state['total_win']}")
+        
+        # Handle bonus symbols
+        bonus_spins_added = 0
+        for symbol in reel_symbols:
+            if symbol == "Bat":
+                bonus_spins_added += 5
+            elif symbol == "Golden Bat":
+                bonus_spins_added += 5
+                # Golden Bat in Bonk Spins upgrades to Super Bonk Spins
+                bonus_state["upgrade_to_super"] = True
+                # ACTUALLY PERFORM THE UPGRADE HERE
+                if bonus_state["type"] == "BONK_SPINS":
+                    print(f"DEBUG: Upgrading from BONK_SPINS to SUPER_BONK_SPINS in process_bonk_spin!")
+                    bonus_state["type"] = "SUPER_BONK_SPINS"
+                    bonus_state["multiplier"] = 4  # SUPER_BONK_SPINS has 4x multiplier
+                    bonus_state["upgraded_from_bonk"] = True
+                    
+                    # CRITICAL: Initialize sticky values for SUPER_BONK_SPINS
+                    bonus_state["sticky_value"] = None
+                    bonus_state["sticky_reel"] = None
+                    print(f"DEBUG: Initialized sticky values for SUPER_BONK_SPINS")
+                    
+                    # CRITICAL: Preserve total_win from BONK_SPINS
+                    print(f"DEBUG: Preserved total_win from BONK_SPINS: {bonus_state['total_win']}")
+                    
+                    # CRITICAL: Create BONUS_TRIGGER event for the upgrade
+                    # We need to access gamestate to create the event
+                    # This will be handled in gamestate.py after process_bonk_spin returns
+        
+        bonus_state["spins_left"] += bonus_spins_added
         bonus_state["symbols_collected"].extend(reel_symbols)
         bonus_state["spins_left"] -= 1
         
-        # Golden Bat gives extra spins and multiplier boost
-        if "Golden Bat" in reel_symbols:
-            bonus_state["spins_left"] += 5
-            bonus_state["multiplier"] += 1
+        # Store current spin win for gamestate to use
+        bonus_state["current_spin_win"] = spin_win
+        
+        return bonus_state
+
+    def process_super_bonk_spin(self, bonus_state: dict, reel_symbols: list) -> dict:
+        """Process SUPER_BONK_SPINS logic with sticky value"""
+        # Initialize sticky values if not present
+        if "sticky_value" not in bonus_state:
+            bonus_state["sticky_value"] = None
+        if "sticky_reel" not in bonus_state:
+            bonus_state["sticky_reel"] = None
+            
+        # Get numeric values from reels (Bat and Golden Bat = 0 in SUPER_BONK_SPINS mode)
+        def get_symbol_value(symbol):
+            if symbol == "Bat" or symbol == "Golden Bat":
+                return 0
+            elif symbol in ["1", "2", "3", "4", "5"]:
+                return int(symbol)
+            else:
+                return 0
+        
+        mult1 = get_symbol_value(reel_symbols[0]) if len(reel_symbols) > 0 else 0
+        mult2 = get_symbol_value(reel_symbols[1]) if len(reel_symbols) > 1 else 0
+        
+        print(f"DEBUG: SUPER_BONK_SPINS - mult1: {mult1}, mult2: {mult2}, sticky_value: {bonus_state['sticky_value']}")
+        
+        # Calculate current spin win
+        current_win = mult1 * mult2
+        
+        # Apply 1x1=0 rule ONLY when both values are exactly 1
+        if mult1 == 1 and mult2 == 1:
+            current_win = 0
+        
+        if current_win > 0:
+            # Have win - this is when we fix the sticky value
+            if bonus_state["sticky_value"] is None:
+                # First time we have a win - fix the larger value and its position
+                if mult1 > mult2:
+                    bonus_state["sticky_value"] = mult1
+                    bonus_state["sticky_reel"] = 0
+                    print(f"DEBUG: First win! Fixed reel 0 with value {mult1}")
+                else:
+                    bonus_state["sticky_value"] = mult2
+                    bonus_state["sticky_reel"] = 1
+                    print(f"DEBUG: First win! Fixed reel 1 with value {mult2}")
+            else:
+                # Already have sticky value - update only if new value is larger on the SAME reel
+                current_sticky_reel = bonus_state["sticky_reel"]
+                current_sticky_value = bonus_state["sticky_value"]
+                
+                if current_sticky_reel == 0:
+                    # Sticky is on reel 0, check if mult1 is larger
+                    if mult1 > current_sticky_value:
+                        bonus_state["sticky_value"] = mult1
+                        print(f"DEBUG: Updated sticky on reel 0 from {current_sticky_value} to {mult1}")
+                    else:
+                        print(f"DEBUG: Keeping current sticky value {current_sticky_value} on reel 0")
+                else:
+                    # Sticky is on reel 1, check if mult2 is larger
+                    if mult2 > current_sticky_value:
+                        bonus_state["sticky_value"] = mult2
+                        print(f"DEBUG: Updated sticky on reel 1 from {current_sticky_value} to {mult2}")
+                    else:
+                        print(f"DEBUG: Keeping current sticky value {current_sticky_value} on reel 1")
+        else:
+            # No current win - but we might still have a sticky value
+            print(f"DEBUG: No current win (current_win = {current_win}), keeping sticky_value = {bonus_state['sticky_value']} from reel {bonus_state['sticky_reel']}")
+        
+        # Calculate spinWin using sticky logic
+        if bonus_state["sticky_value"] is not None:
+            # Get the value from the non-sticky reel
+            if bonus_state["sticky_reel"] == 0:
+                # Sticky is on reel 0, use reel 1 value
+                non_sticky_value = mult2
+            else:
+                # Sticky is on reel 1, use reel 0 value
+                non_sticky_value = mult1
+            
+            # spinWin = sticky_value × non_sticky_value
+            spin_win = bonus_state["sticky_value"] * non_sticky_value
+            
+            # Add to total_win (accumulate)
+            old_total_win = bonus_state["total_win"]
+            bonus_state["total_win"] += spin_win
+            # Store current spin win for gamestate to use
+            bonus_state["current_spin_win"] = spin_win
+            print(f"DEBUG: Sticky logic: {bonus_state['sticky_value']} (reel {bonus_state['sticky_reel']}) × {non_sticky_value} = {spin_win}, total_win: {old_total_win} + {spin_win} = {bonus_state['total_win']}")
+        else:
+            # No sticky value yet - no win
+            spin_win = 0
+            bonus_state["current_spin_win"] = 0
+            print(f"DEBUG: No sticky value yet - no win for this spin")
+        
+        bonus_state["symbols_collected"].extend(reel_symbols)
+        bonus_state["spins_left"] -= 1
+        
+        # Golden Bat gives extra spins
+        bonus_spins_added = 0
+        for symbol in reel_symbols:
+            if symbol == "Golden Bat":
+                bonus_spins_added += 5
+        
+        bonus_state["spins_left"] += bonus_spins_added
+        if bonus_spins_added > 0:
+            print(f"DEBUG: Golden Bat found! Added {bonus_spins_added} extra spins, new spins_left: {bonus_state['spins_left']}")
         
         return bonus_state
 
@@ -186,17 +363,19 @@ class BonkBoiEvents:
         """Check if current bonus game is complete"""
         if self.bonus_state:
             return self.bonus_state["spins_left"] <= 0
-        return self.bonus_spins_left <= 0
+        return (self.bonus_spins_left <= 0 and self.super_bonus_mode == False) or (self.bonus_spins_left <= 0 and self.bonus_mode == False)
 
     def get_bonus_summary(self):
         """Get summary of completed bonus game"""
         if self.bonus_state:
-            return {
+            summary = {
                 "type": self.bonus_state["type"],
                 "total_win": self.bonus_state["total_win"],
                 "symbols_collected": self.bonus_state["symbols_collected"],
                 "final_multiplier": self.bonus_state["multiplier"]
             }
+            print(f"DEBUG: get_bonus_summary - type: {summary['type']}, total_win: {summary['total_win']}, final_multiplier: {summary['final_multiplier']}")
+            return summary
         return None
 
     def reset_to_base_game(self):
@@ -212,27 +391,203 @@ class BonkBoiEvents:
         self.bonus_spins_completed = 0
         self.total_bonus_win = 0
 
+    def create_bonus_trigger_event(self, gamestate, bonus_type, trigger_symbols, trigger_win, spins_received):
+        """Create BONUS_TRIGGER event"""
+        # Generate unique bonus session ID
+        bonus_session_id = f"bonus_{len(gamestate.book.events)}_{bonus_type}"
+        
+        # Determine reel set based on bonus type
+        if bonus_type == "SUPER_BONK_SPINS":
+            reel_set = "BON2"  # SUPER_BONK_SPINS uses BON2 reels
+        elif bonus_type == "BONK_SPINS":
+            reel_set = "BON1"  # BONK_SPINS uses BON1 reels
+        else:
+            reel_set = self.current_reel_set
+        
+        event = {
+            "index": len(gamestate.book.events),
+            "type": EventConstants.BONUS_TRIGGER.value,
+            "bonusType": bonus_type,
+            "gameType": gamestate.gametype,
+            "bonusSessionId": bonus_session_id,
+            "reelSet": reel_set,
+            "triggerSymbols": trigger_symbols,
+            "triggerWin": trigger_win,
+            "sessionWin": 0.0,  # sessionWin = 0 for buy bonus mode
+            "spinsReceived": spins_received,
+            "spinsLeft": spins_received
+        }
+        
+        # Add sticky multiplier for SUPER_BONK_SPINS
+        if bonus_type == "SUPER_BONK_SPINS":
+            event["stickyMultiplier"] = self.sticky_multiplier
+        
+        gamestate.book.add_event(event)
+        
+        # Update bonus session ID
+        self.bonus_session_id = bonus_session_id
+        
+        return event
+
+    def create_bonus_spin_event(self, gamestate, spin_number, bonus_session_id, reel_set, spin_win, total_bonus_win, spins_received, spins_left):
+        """Create BONUS_SPIN event"""
+        # Determine actual reel set based on CURRENT bonus type (not session_id which doesn't update after upgrade)
+        if gamestate.events.bonus_state and gamestate.events.bonus_state["type"] == "SUPER_BONK_SPINS":
+            actual_reel_set = "BON2"  # SUPER_BONK_SPINS uses BON2 reels
+        elif gamestate.events.bonus_state and gamestate.events.bonus_state["type"] == "BONK_SPINS":
+            actual_reel_set = "BON1"  # BONK_SPINS uses BON1 reels
+        else:
+            actual_reel_set = reel_set
+        
+        event = {
+            "index": len(gamestate.book.events),
+            "type": EventConstants.BONUS_SPIN.value,
+            "spinNumber": spin_number,
+            "bonusSessionId": bonus_session_id,
+            "reelSet": actual_reel_set,
+            "spinWin": spin_win,
+            "totalBonusWin": total_bonus_win,
+            "spinsReceived": spins_received,
+            "spinsLeft": spins_left,
+            "gameType": gamestate.gametype
+        }
+        print(f"DEBUG: create_bonus_spin_event - created event: spinWin={spin_win}, totalBonusWin={total_bonus_win}, reelSet={actual_reel_set}")
+        return event
+
+    def create_bonus_complete_event(self, gamestate, bonus_session_id, total_bonus_win, spins_completed, bonus_type, final_multiplier):
+        """Create BONUS_COMPLETE event"""
+        print(f"DEBUG: create_bonus_complete_event - bonus_type: {bonus_type}, total_bonus_win: {total_bonus_win}, final_multiplier: {final_multiplier}")
+        
+        event = {
+            "index": len(gamestate.book.events),
+            "type": EventConstants.BONUS_COMPLETE.value,
+            "bonusSessionId": bonus_session_id,
+            "totalBonusWin": total_bonus_win,
+            "spinsCompleted": spins_completed,
+            "bonusType": bonus_type,
+            "finalMultiplier": final_multiplier,
+            "gameType": gamestate.gametype
+        }
+        gamestate.book.add_event(event)
+        return event
+
+    def calculate_base_game_win(self, reels):
+        """Calculate win using base game logic (multiply two symbols)"""
+        print(f"DEBUG: calculate_base_game_win called with reels: {reels}")
+        if len(reels) != 2:
+            print(f"DEBUG: Invalid reels length: {len(reels)}")
+            return 0
+            
+        try:
+            # Get symbols from the two reels
+            symbol1 = reels[0]
+            symbol2 = reels[1]
+            print(f"DEBUG: Symbols: {symbol1}, {symbol2}")
+            
+            # Check if both symbols are "1" - this should return 0 win (1x1=0 rule)
+            if symbol1 == "1" and symbol2 == "1":
+                print(f"DEBUG: 1x1=0 rule applied")
+                return 0
+            
+            # Convert symbols to multipliers directly
+            mult1 = int(symbol1)
+            mult2 = int(symbol2)
+            print(f"DEBUG: Multipliers: {mult1}, {mult2}")
+            
+            # Calculate win: multiply the two symbols
+            win = mult1 * mult2
+            print(f"DEBUG: Calculated win: {win}")
+            return win
+            
+        except ValueError:
+            # If symbols can't be converted to integers, return 0
+            print(f"DEBUG: ValueError converting symbols to int")
+            return 0
+
+    def calculate_bonus_spin_win(self, reels):
+        """Calculate win for bonus spins where Bat and Golden Bat = 1"""
+        if len(reels) < 2:
+            return 0
+            
+        symbol1 = reels[0]
+        symbol2 = reels[1]
+        
+        # Get numeric values - Bat and Golden Bat are always 1 in all modes
+        def get_symbol_value(symbol):
+            if symbol == "Bat" or symbol == "Golden Bat":
+                return 1
+            elif symbol in ["1", "2", "3", "4", "5"]:
+                return int(symbol)
+            else:
+                return 0
+        
+        mult1 = get_symbol_value(symbol1)
+        mult2 = get_symbol_value(symbol2)
+        
+        # Apply the 1x1=0 rule ONLY when both values are exactly 1
+        if mult1 == 1 and mult2 == 1:
+            return 0  # 1x1=0 rule applies only to 1x1 combinations
+        
+        return mult1 * mult2
+
+    def get_symbol_value(self, symbol):
+        """Get numeric value of symbol for SUPER_BONK_SPINS"""
+        if symbol == "Golden Bat":
+            return 10
+        elif symbol == "Bat":
+            return 0  # Bat = 0 in SUPER_BONK_SPINS
+        else:
+            try:
+                return int(symbol)
+            except ValueError:
+                return 0
+
 
 def reveal_event_bonk_boi(gamestate):
-    """Custom reveal event for Bonk Boi game - only shows 2 reels, 1 row each."""
+    """Create reveal event for Bonk Boi game"""
+    # Check if this is buy bonus mode and first reveal
+    current_betmode = gamestate.get_current_betmode()
+    is_buy_bonus = current_betmode and current_betmode.get_buybonus()
+    is_first_reveal = len(gamestate.book.events) == 0
+    
+    # For buy bonus first reveal, create custom board based on bonus type
+    if is_buy_bonus and is_first_reveal:
+        if current_betmode._name == "buy_super_bonk_spins":
+            # For SUPER_BONK_SPINS, first reveal should be Golden Bat + 1
+            symbol_names = ["Golden Bat", "1"]
+        else:
+            # For BONK_SPINS, first reveal should be Bat + 1
+            symbol_names = ["Bat", "1"]
+            
+        # Create custom board with appropriate symbols
+        custom_board = []
+        for symbol_name in symbol_names:
+            # Create a simple symbol object with name attribute
+            symbol_obj = type('Symbol', (), {'name': symbol_name})()
+            custom_board.append([symbol_obj])
+        gamestate.board = custom_board
+    elif gamestate.gametype != "free":
+        # Only create board for non-free gametypes (base, bonus1, bonus2)
+        gamestate.create_board_reelstrips()
+    
+    # Convert board to JSON-ready format
     board_client = []
     special_attributes = list(gamestate.config.special_symbols.keys())
     
     # Only take the first symbol (row 0) for each of 2 reels
     for reel in range(2):  # Only 2 reels
         board_client.append([json_ready_sym(gamestate.board[reel][0], special_attributes)])
-
-    if gamestate.config.include_padding:
-        for reel in range(2):  # Only 2 reels
-            board_client[reel] = [json_ready_sym(gamestate.top_symbols[reel], special_attributes)] + board_client[reel]
-            board_client[reel].append(json_ready_sym(gamestate.bottom_symbols[reel], special_attributes))
-
+    
+    # Create reveal event
     event = {
         "index": len(gamestate.book.events),
         "type": EventConstants.REVEAL.value,
         "board": board_client,
-        "paddingPositions": gamestate.reel_positions[:2],  # Only first 2 positions
+        "paddingPositions": gamestate.padding_position,
         "gameType": gamestate.gametype,
-        "anticipation": gamestate.anticipation[:2],  # Only first 2 anticipation values
+        "anticipation": [0, 0]
     }
+    
     gamestate.book.add_event(event)
+    
+    return event

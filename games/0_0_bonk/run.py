@@ -92,13 +92,15 @@ if __name__ == "__main__":
     num_threads = 10
     rust_threads = 10
     batching_size = 500_000
-    compression = True
+    compression = False
     profiling = False
 
     num_sim_args = {
-        "base": int(10_000_000),
-        "bonus1": int(10_000_000),  # Bonus game 1 (BONK_SPINS)
-        "bonus2": int(10_000_000),  # Bonus game 2 (SUPER_BONK_SPINS)
+        "base": int(10),  # Збільшуємо для різноманітності
+        # "bonus1": int(10),  # Bonus game 1 (BONK_SPINS)
+        # "bonus2": int(10),  # Bonus game 2 (SUPER_BONK_SPINS)
+        "buy_bonk_spins": int(100),
+        "buy_super_bonk_spins": int(10),  # Тестуємо новий режим
     }
 
     run_conditions = {
@@ -107,7 +109,7 @@ if __name__ == "__main__":
         "run_analysis": False,
         "upload_data": False,
     }
-    target_modes = ["base", "bonus1", "bonus2"]
+    target_modes = ["base", "buy_bonk_spins", "buy_super_bonk_spins"]  # Тестуємо тільки базову гру
 
     print("🚀 Launching optimized 10M simulation")
     print(f"📊 Parameters:")
@@ -115,7 +117,7 @@ if __name__ == "__main__":
     print(f"   - Rust threads: {rust_threads}")
     print(f"   - Batch size: {batching_size:,}")
     print(f"   - Compression: {compression}")
-    print(f"   - Simulations: {num_sim_args['base']:,}")
+    print(f"   - Simulations: {sum(num_sim_args.values()):,}")
     # print(f"⏱️  Expected time: ~10-15 minutes")
     # print(f"💾 RAM usage: ~4-6 GB")
 
@@ -130,15 +132,45 @@ if __name__ == "__main__":
         print("\n⚡ Starting simulation...")
         monitor_memory()  # Monitor before start
         
-        create_books(
-            gamestate,
-            config,
-            num_sim_args,
-            batching_size,
-            num_threads,
-            compression,
-            profiling,
-        )
+        # print(f"DEBUG: num_sim_args: {num_sim_args}")
+        # print(f"DEBUG: bet_modes: {[bm._name for bm in config.bet_modes]}")
+        # print(f"DEBUG: About to call create_books with base mode: {num_sim_args.get('base', 'NOT_FOUND')}")
+        # print(f"DEBUG: About to call create_books with buy_bonk_spins mode: {num_sim_args.get('buy_bonk_spins', 'NOT_FOUND')}")
+        # print(f"DEBUG: About to call create_books with buy_super_bonk_spins mode: {num_sim_args.get('buy_super_bonk_spins', 'NOT_FOUND')}")
+        # print(f"DEBUG: About to call create_books with all modes: {list(num_sim_args.keys())}")
+        # print(f"DEBUG: About to call create_books with all values: {list(num_sim_args.values())}")
+        
+        print(f"DEBUG: About to call create_books function...")
+        print(f"DEBUG: create_books function object: {create_books}")
+        print(f"DEBUG: gamestate object: {gamestate}")
+        print(f"DEBUG: config object: {config}")
+        
+        print(f"DEBUG: About to call create_books with arguments:")
+        print(f"DEBUG: - gamestate: {type(gamestate)}")
+        print(f"DEBUG: - config: {type(config)}")
+        print(f"DEBUG: - num_sim_args: {type(num_sim_args)}")
+        print(f"DEBUG: - batching_size: {type(batching_size)} = {batching_size}")
+        print(f"DEBUG: - num_threads: {type(num_threads)} = {num_threads}")
+        print(f"DEBUG: - compression: {type(compression)} = {compression}")
+        print(f"DEBUG: - profiling: {type(profiling)} = {profiling}")
+        
+        
+        
+        try:
+            create_books(
+                gamestate,
+                config,
+                num_sim_args,
+                batching_size,
+                num_threads,
+                compression,
+                profiling,
+            )
+            print(f"DEBUG: create_books function completed successfully")
+        except Exception as e:
+            print(f"DEBUG: Error in create_books: {e}")
+            import traceback
+            traceback.print_exc()
         
         monitor_memory()  # Monitor after completion
 

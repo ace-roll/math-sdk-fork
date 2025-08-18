@@ -52,6 +52,9 @@ class GameConfig(Config):
             "base": {
                 "reels": ["games/0_0_bonk/reels/BR0.csv", "games/0_0_bonk/reels/BR0.csv"]
             },
+            "free": {
+                "reels": ["games/0_0_bonk/reels/BON1.csv", "games/0_0_bonk/reels/BON1.csv"]
+            },
             "bonus1": {
                 "reels": ["games/0_0_bonk/reels/BON1.csv", "games/0_0_bonk/reels/BON1.csv"]
             },
@@ -76,7 +79,7 @@ class GameConfig(Config):
                         quota=1,
                         win_criteria=None,
                         conditions={
-                            "reel_weights": {self.basegame_type: {"BR0": 1}},
+                            "reel_weights": {self.basegame_type: {"BR0": 1}, self.freegame_type: {"BR0": 1}},
                             "force_wincap": False,
                             "force_freegame": False,
                         }
@@ -97,7 +100,7 @@ class GameConfig(Config):
                         quota=1,
                         win_criteria=None,
                         conditions={
-                            "reel_weights": {self.basegame_type: {"BON1": 1}},
+                            "reel_weights": {self.basegame_type: {"BON1": 1}, self.freegame_type: {"BON1": 1}},
                             "force_wincap": False,
                             "force_freegame": False,
                         }
@@ -118,9 +121,51 @@ class GameConfig(Config):
                         quota=1,
                         win_criteria=None,
                         conditions={
-                            "reel_weights": {self.basegame_type: {"BON2": 1}},
+                            "reel_weights": {self.basegame_type: {"BON2": 1}, self.freegame_type: {"BON2": 1}},
                             "force_wincap": False,
                             "force_freegame": False,
+                        }
+                    )
+                ]
+            ),
+            BetMode(
+                name="buy_bonk_spins",
+                cost=10.0,
+                rtp=0.96,
+                max_win=5000.0,
+                auto_close_disabled=False,
+                is_feature=True,
+                is_buybonus=True,  # Це режим покупки бонусу
+                distributions=[
+                    Distribution(
+                        criteria="buy_bonk_spins",
+                        quota=1,
+                        win_criteria=None,
+                        conditions={
+                            "reel_weights": {self.basegame_type: {"BON1": 1}},
+                            "force_wincap": False,
+                            "force_freegame": True,  # Примусово запускає бонусну гру
+                        }
+                    )
+                ]
+            ),
+            BetMode(
+                name="buy_super_bonk_spins",
+                cost=25.0,  # Вища вартість для супер-бонусу
+                rtp=0.96,
+                max_win=5000.0,
+                auto_close_disabled=False,
+                is_feature=True,
+                is_buybonus=True,  # Режим покупки бонусу
+                distributions=[
+                    Distribution(
+                        criteria="buy_super_bonk_spins",
+                        quota=1,
+                        win_criteria=None,
+                        conditions={
+                            "reel_weights": {self.basegame_type: {"BON2": 1}},
+                            "force_wincap": False,
+                            "force_freegame": True,  # Примусово запускає бонусну гру
                         }
                     )
                 ]
@@ -169,11 +214,14 @@ class GameConfig(Config):
         
         # BON2 for second bonus game (Bat: 0, Golden Bat: 10)
         self.reels["BON2"] = [bonus2_reel_symbols, bonus2_reel_symbols]  # 2 reels, both using same symbols
+        
+        # Add free game reels (same as BON1)
+        self.reels["free"] = [bonus1_reel_symbols, bonus1_reel_symbols]  # 2 reels with BON1 for bonus games
 
         # Set up padding reels for standard system - use proper format
         self.padding_reels = {}
         self.padding_reels[self.basegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels with BR0
-        self.padding_reels[self.freegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels with BR0 (fallback)
+        self.padding_reels[self.freegame_type] = [bonus1_reel_symbols, bonus1_reel_symbols]  # 2 reels with BON1 for bonus games
 
     def read_single_column_csv(self, file_path):
         """Read single column CSV file (one symbol per line)"""

@@ -242,12 +242,23 @@ class GeneralGameState(ABC):
             self.run_spin(sim)
         mode_cost = self.get_current_betmode().get_cost()
 
+        # Avoid division by zero
+        if mode_cost <= 0:
+            print(f"Warning: mode_cost is {mode_cost}, cannot calculate RTP")
+            rtp = 0.0
+            base_rtp = 0.0
+            free_rtp = 0.0
+        else:
+            rtp = round(self.win_manager.total_cumulative_wins / (num_sims * mode_cost), 3)
+            base_rtp = round(self.win_manager.cumulative_base_wins/(num_sims*mode_cost), 3)
+            free_rtp = round(self.win_manager.cumulative_free_wins/(num_sims*mode_cost), 3)
+
         print(
             "Thread " + str(thread_index),
             "finished with",
-            round(self.win_manager.total_cumulative_wins / (num_sims * mode_cost), 3),
+            rtp,
             "RTP.",
-            f"[baseGame: {round(self.win_manager.cumulative_base_wins/(num_sims*mode_cost), 3)}, freeGame: {round(self.win_manager.cumulative_free_wins/(num_sims*mode_cost), 3)}]",
+            f"[baseGame: {base_rtp}, freeGame: {free_rtp}]",
             flush=True,
         )
 
