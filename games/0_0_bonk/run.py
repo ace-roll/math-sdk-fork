@@ -96,11 +96,13 @@ if __name__ == "__main__":
     profiling = False
 
     num_sim_args = {
-        "base": int(10),  # Збільшуємо для різноманітності
-        # "bonus1": int(10),  # Bonus game 1 (BONK_SPINS)
-        # "bonus2": int(10),  # Bonus game 2 (SUPER_BONK_SPINS)
-        "buy_bonk_spins": int(100),
-        "buy_super_bonk_spins": int(10),  # Тестуємо новий режим
+        "base": int(100_000),  # Тестуємо базовий режим
+        "bonus_hunt": int(100_000),  # Ідентичний до base, але з Bonus_Hunt.csv та cost 1.5
+        "Horny_Jail": int(100_000),  # Спеціальний режим з замороженим першим барабаном на 1000
+        "bonus1": int(10),  # Bonus game 1 (BONK_SPINS)
+        "bonus2": int(10),  # Bonus game 2 (SUPER_BONK_SPINS)
+        "buy_bonk_spins": int(100_000),
+        "buy_super_bonk_spins": int(100_000),  # Тестуємо новий режим
     }
 
     run_conditions = {
@@ -109,7 +111,7 @@ if __name__ == "__main__":
         "run_analysis": False,
         "upload_data": False,
     }
-    target_modes = ["base", "buy_bonk_spins", "buy_super_bonk_spins"]  # Тестуємо тільки базову гру
+    target_modes = ["base", "bonus_hunt", "Horny_Jail", "bonus1", "bonus2", "buy_bonk_spins", "buy_super_bonk_spins"]
 
     print("🚀 Launching optimized 10M simulation")
     print(f"📊 Parameters:")
@@ -140,19 +142,19 @@ if __name__ == "__main__":
         # print(f"DEBUG: About to call create_books with all modes: {list(num_sim_args.keys())}")
         # print(f"DEBUG: About to call create_books with all values: {list(num_sim_args.values())}")
         
-        print(f"DEBUG: About to call create_books function...")
-        print(f"DEBUG: create_books function object: {create_books}")
-        print(f"DEBUG: gamestate object: {gamestate}")
-        print(f"DEBUG: config object: {config}")
+        # print(f"DEBUG: About to call create_books function...")
+        # print(f"DEBUG: create_books function object: {create_books}")
+        # print(f"DEBUG: gamestate object: {gamestate}")
+        # print(f"DEBUG: config object: {config}")
         
-        print(f"DEBUG: About to call create_books with arguments:")
-        print(f"DEBUG: - gamestate: {type(gamestate)}")
-        print(f"DEBUG: - config: {type(config)}")
-        print(f"DEBUG: - num_sim_args: {type(num_sim_args)}")
-        print(f"DEBUG: - batching_size: {type(batching_size)} = {batching_size}")
-        print(f"DEBUG: - num_threads: {type(num_threads)} = {num_threads}")
-        print(f"DEBUG: - compression: {type(compression)} = {compression}")
-        print(f"DEBUG: - profiling: {type(profiling)} = {profiling}")
+        # print(f"DEBUG: About to call create_books with arguments:")
+        # print(f"DEBUG: - gamestate: {type(gamestate)}")
+        # print(f"DEBUG: - config: {type(config)}")
+        # print(f"DEBUG: - num_sim_args: {type(num_sim_args)}")
+        # print(f"DEBUG: - batching_size: {type(batching_size)} = {batching_size}")
+        # print(f"DEBUG: - num_threads: {type(num_threads)} = {num_threads}")
+        # print(f"DEBUG: - compression: {type(compression)} = {compression}")
+        # print(f"DEBUG: - profiling: {type(profiling)} = {profiling}")
         
         
         
@@ -198,4 +200,4 @@ if __name__ == "__main__":
     
     print("✅ 10M simulation completed!")
     print(f"⏱️  Total time: {total_time:.2f} seconds ({total_time/60:.2f} minutes)")
-    print(f"📈 Speed: {num_sim_args['base']/total_time:,.0f} simulations/second")
+    print(f"📈 Speed: {sum(num_sim_args.values())/total_time:,.0f} simulations/second")
