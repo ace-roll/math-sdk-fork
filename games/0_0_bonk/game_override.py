@@ -1,5 +1,6 @@
 """Game override functions for Bonk Boi multiplier game with bonus games."""
 
+import re
 from game_executables import GameExecutables
 from src.calculations.statistics import get_random_outcome
 
@@ -17,6 +18,10 @@ class GameStateOverride(GameExecutables):
         self.bonus_session_id = None
         # Reset Horny_Jail processing flag
         self._horny_jail_processed = False
+        
+        # Reset win_manager for new simulation
+        if hasattr(self, 'win_manager'):
+            self.win_manager.reset_end_round_wins()
 
     def create_board_reelstrips(self):
         """Create board using appropriate reel strips based on current game state."""
@@ -32,9 +37,48 @@ class GameStateOverride(GameExecutables):
         # Special logic for Horny_Jail mode: first reel always shows "1000"
         if reel_set == "Horny_Jail":
             self.create_horny_jail_board()
+        elif reel_set == "Bonus_Hunt":
+            # Create board manually using current_reel_strips instead of parent method
+            self.create_board_from_reel_strips()
         else:
-            # Create board using parent method for normal modes
+            # Create board manually using current_reel_strips instead of parent method
+            self.create_board_from_reel_strips()
+
+    def create_board_from_reel_strips(self):
+        """Create board manually using current_reel_strips to ensure correct symbols are used."""
+        if not hasattr(self, 'current_reel_strips') or not self.current_reel_strips:
+            # Fallback to parent method if current_reel_strips not set
             super().create_board_reelstrips()
+            return
+        
+        # Create board manually using current_reel_strips
+        self.board = []
+        
+        # Get symbols from current reel strips
+        reel1_symbols = self.current_reel_strips[0]  # First reel
+        reel2_symbols = self.current_reel_strips[1]  # Second reel
+        
+        # Select random symbols from each reel
+        import random
+        
+        # reel1_symbols = [x for x in reel1_symbols if x.isnumeric()]
+        # reel2_symbols = [x for x in reel2_symbols if x.isnumeric()]
+        # reel1_symbols = sorted(set(reel1_symbols))
+        # reel2_symbols = sorted(set(reel2_symbols))
+        # First reel
+        symbol1_name = random.choice(reel1_symbols)
+        symbol1_obj = type('Symbol', (), {'name': str(symbol1_name)})()
+        self.board.append([symbol1_obj])
+        
+        # Second reel
+        symbol2_name = random.choice(reel2_symbols)
+        symbol2_obj = type('Symbol', (), {'name': str(symbol2_name)})()
+        self.board.append([symbol2_obj])
+
+        # print(symbol1_name, symbol2_name)
+        
+        # Set padding positions for events
+        self.padding_position = [random.randint(0, 50000), random.randint(0, 50000)]
 
     def set_reel_set(self, reel_set):
         """Set the current reel set and update game state."""
@@ -83,11 +127,12 @@ class GameStateOverride(GameExecutables):
         
         # Calculate win: 1000 × symbol from second reel
         second_reel_value = int(random_symbol)
+        # CRITICAL: final_win should be the absolute win amount for proper calculation
         self.final_win = 1000 * second_reel_value
         
         # Set win components for proper RTP calculation
-        # base_game_win should be X (second reel value), not 1000×X
-        self.base_game_win = second_reel_value
+        # base_game_win should be the absolute win amount for proper RTP calculation
+        self.base_game_win = 1000 * second_reel_value
         self.free_game_win = 0.0
         
         # Set random padding positions for events (like other modes)
@@ -97,16 +142,44 @@ class GameStateOverride(GameExecutables):
         # Set board in game state
         self.current_board = self.board
         
-        # For Horny_Jail mode, set payoutMultiplier directly without dividing by cost
-        # This ensures payoutMultiplier shows as 1000×X instead of (1000×X)/20000
-        self.payout_multiplier = self.final_win
+        # For Horny_Jail mode, set payoutMultiplier to absolute win amount
+        # This ensures payoutMultiplier shows as 1000×X instead of multiplier units
+        self.payout_multiplier = 1000 * second_reel_value
         
         # Set book fields so writer uses desired values
         if hasattr(self, 'book'):
-            self.book.payout_multiplier = self.final_win
-            # baseGameWins should reflect 1000×X
-            self.book.basegame_wins = float(self.final_win)
+            # CRITICAL: payoutMultiplier should be the actual win amount (e.g., 1000 × 100 = 100000)
+            self.book.payout_multiplier = 1000 * second_reel_value
+            # baseGameWins should reflect the base game win (e.g., 1000 × 5 = 5000)
+            # base_game_win is now in multiplier units, so convert back to absolute win for display
+            # CRITICAL: baseGameWins must be float type
+            self.book.basegame_wins = float(1000 * second_reel_value)
             self.book.freegame_wins = 0.0
+        
+        # Create reveal event for Horny_Jail mode
+        if hasattr(self, 'book'):
+            from src.events.events import json_ready_sym, EventConstants
+            
+            # Convert board to JSON-ready format
+            board_client = []
+            special_attributes = list(self.config.special_symbols.keys())
+            
+            # Only take the first symbol (row 0) for each of 2 reels
+            for reel in range(2):  # Only 2 reels
+                board_client.append([json_ready_sym(self.board[reel][0], special_attributes)])
+            
+            # Create reveal event with proper structure
+            reveal_event = {
+                "index": len(self.book.events),
+                "type": EventConstants.REVEAL.value,
+                "board": board_client,
+                "paddingPositions": self.padding_position,
+                "gameType": self.config.basegame_type,
+                "anticipation": [0, 0]
+            }
+            
+            # Add the reveal event to the book
+            self.book.add_event(reveal_event)
         
         # Update win manager for proper RTP calculation
         # Only update if we haven't already processed this spin to avoid double counting
@@ -128,12 +201,16 @@ class GameStateOverride(GameExecutables):
             self.win_manager.update_gametype_wins(self.config.basegame_type)
             
             # Set win_data for proper final calculation
-            self.win_data = {"totalWin": result_multiplier}
+            # finalWin.amount should show the actual win amount (1000 × 3 = 3000), not the multiplier
+            self.win_data = {"totalWin": 1000 * second_reel_value}
             
             # Mark as processed to prevent double updates
             self._horny_jail_processed = True
         
-        # Do not imprint or add events here; normal flow will add REVEAL and FINALWIN in order
+        # CRITICAL: DO NOT create finalWin event here - it will be created by evaluate_finalwin()
+        # This prevents finalWin events from being carried over to other modes
+        
+        # Do not imprint or add events here; normal flow will add FINALWIN in order
         
         # Return early to avoid overwriting the win calculation
         return

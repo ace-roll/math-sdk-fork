@@ -19,6 +19,7 @@ class GameState(GameStateOverride):
         self.bonus_spins_left = 0  # Add missing attribute
         self.needs_upgrade_bonus_trigger = False  # Track if we need to create upgrade BONUS_TRIGGER
         self.upgrade_bonus_trigger_created = False  # Track if upgrade BONUS_TRIGGER was already created
+        self.upgrade_trigger_symbols = None  # Store symbols that triggered the upgrade
 
     def run_spin(self, sim: int) -> None:
         """Run a single spin for Bonk Boi game."""
@@ -27,10 +28,12 @@ class GameState(GameStateOverride):
         while self.repeat:
             self.reset_book()
             
-            # Check if this is Horny_Jail mode
+            # Check if this is Horny_Jail or Bonus_Hunt mode
             current_betmode = self.get_current_betmode()
             if current_betmode and current_betmode.get_name() == "Horny_Jail":
                 self.events.current_reel_set = "Horny_Jail"
+            elif current_betmode and current_betmode.get_name() == "bonus_hunt":
+                self.events.current_reel_set = "Bonus_Hunt"
             
             # Create board without emitting standard reveal event
             self.create_board_reelstrips()
@@ -48,9 +51,13 @@ class GameState(GameStateOverride):
                 betmode_name = current_betmode.get_name()
                 is_super_bonk = betmode_name == "buy_super_bonk_spins"
                 
-                # First reveal event - base game with Bat symbols
+                # First reveal event - custom board for buy bonus mode
                 self.gametype = self.config.basegame_type
-                self.create_board_reelstrips()
+                
+                # CRITICAL: Remove any existing reveal events from previous modes (like Horny_Jail)
+                if hasattr(self, 'book') and self.book.events:
+                    # Find and remove any existing reveal events
+                    self.book.events = [event for event in self.book.events if event.get('type') != 'reveal']
                 
                 # Force the first reveal to show ["Bat", "1"] for buy bonus mode
                 # Create a custom board with Bat and 1 symbols using simple dict format
@@ -75,9 +82,6 @@ class GameState(GameStateOverride):
                 
                 self.events.trigger_bonus(bonus_type, spins_count)
                 self.add_bonus_event(bonus_type)
-                
-                # For buy bonus mode, use appropriate reels
-                self.events.current_reel_set = reel_set
                 
                 # Initialize bonus state for the new bonus round
                 if self.events.super_bonus_mode:
@@ -144,6 +148,13 @@ class GameState(GameStateOverride):
                                     self.events.bonus_state["type"] = "SUPER_BONK_SPINS"
                                     self.events.bonus_state["multiplier"] = 4  # SUPER_BONK_SPINS has 4x multiplier
                                     self.events.bonus_state["upgraded_from_bonk"] = True
+                                
+                                # CRITICAL: Mark that we need to create BONUS_TRIGGER event for upgrade
+                                self.needs_upgrade_bonus_trigger = True
+                                
+                                # CRITICAL: Store the symbols that triggered the upgrade for BONUS_TRIGGER event
+                                # Use actual symbols from current board (Golden Bat can be on either reel)
+                                self.upgrade_trigger_symbols = list(reels)
                     
                     # Note: Extra spins are now handled ONLY in process_bonus_spin_logic to avoid duplication
                     
@@ -213,7 +224,7 @@ class GameState(GameStateOverride):
                         self.events.create_bonus_trigger_event(
                             self,
                             "SUPER_BONK_SPINS",  # bonus_type for upgrade
-                            reels,  # Use current board symbols as trigger symbols
+                            self.upgrade_trigger_symbols,  # Use stored upgrade trigger symbols
                             0,  # trigger_win = 0 for upgrade
                             5   # spins_received = 5 for Golden Bat upgrade
                         )
@@ -245,27 +256,56 @@ class GameState(GameStateOverride):
                 # Ensure win_manager has the correct values for final calculation
                 self.win_manager.running_bet_win = total_bonus_win
                 
+                # Update the win_manager to properly track base and free game wins
+                # For buy bonus mode, all wins are considered free game wins
+                self.win_manager.freegame_wins = total_bonus_win
+                self.win_manager.basegame_wins = 0.0
+                
                 # Also update the win_data to ensure proper final calculation
                 self.win_data = {"totalWin": total_bonus_win}
                 
-                # Evaluate final win immediately for buy bonus mode to set payoutMultiplier
+                # CRITICAL: Call evaluate_finalwin() for buy bonus mode to create finalWin event
+                # This creates the finalWin event at the end of bonus spins
                 self.evaluate_finalwin()
-            else:
-                # Normal base game - use custom reveal event for Bonk Boi
-                reveal_event_bonk_boi(self)
-                
-                # Get symbols from the NEW board (after reveal_event_bonk_boi)
+            elif current_betmode and current_betmode.get_name() == "Horny_Jail":
+                # Horny_Jail mode - special handling, no bonus symbols, no additional board creation
+                # Board already created by create_horny_jail_board() above
+                # Just process the spin without additional logic
                 reels = self.get_board_symbols()
+                result = self.events.calculate_horny_jail_win(reels)
+                self.result = result
                 
-                # Process base game spin using original logic
+                # Set gametype for Horny_Jail
+                self.gametype = self.config.basegame_type
+                
+                # No bonus games for Horny_Jail
+                bonus_type = None
+                
+                # Note: reveal event is already created in create_horny_jail_board()
+                # so we don't need to call reveal_event_bonk_boi here
+                
+                # CRITICAL: Call evaluate_finalwin() to create finalWin event for Horny_Jail mode
+                # This ensures payoutMultiplier is set before finalWin.amount is calculated
+                self.evaluate_finalwin()
+            elif current_betmode and current_betmode.get_name() == "bonus_hunt":
+                # Bonus_Hunt mode - works exactly like base mode but uses Bonus_Hunt reel set
+                # Board already created with Bonus_Hunt reel set above
+                # Process spin using same logic as base game
+                reels = self.get_board_symbols()
                 result, bonus_type = self.events.process_spin(reels)
                 self.result = result
                 
-                # Check for bonus symbols in base game (Bat or Golden Bat)
+                # Set gametype for Bonus_Hunt
+                self.gametype = self.config.basegame_type
+                
+                # Create reveal event for Bonus_Hunt mode
+                reveal_event_bonk_boi(self)
+                
+                # Check for bonus symbols in Bonus_Hunt mode (Bat or Golden Bat)
                 bonus_count = sum(1 for symbol in reels if symbol == "Bat")
                 super_bonus_count = sum(1 for symbol in reels if symbol == "Golden Bat")
                 
-                # Handle bonus if triggered by bonus symbols
+                # Handle bonus if triggered by bonus symbols (same as base mode)
                 if bonus_count > 0 or super_bonus_count > 0:
                     # First, attribute the base spin's win to baseGameWins as multiplier units
                     bet_amount = self.get_current_betmode().get_cost()
@@ -283,17 +323,24 @@ class GameState(GameStateOverride):
                         spins_count = 15 if bonus_count == 2 else 10
                         bonus_type = "BONK_SPINS"
                     
-                    # Trigger bonus
+                    # CRITICAL: Set correct reel set BEFORE triggering bonus
+                    if bonus_type == "SUPER_BONK_SPINS":
+                        self.events.current_reel_set = "BON2"
+                    else:
+                        self.events.current_reel_set = "BON1"
+                    
+                    # Trigger bonus (this will use the reel set we just set)
                     self.events.trigger_bonus(bonus_type, spins_count)
+                    
                     # Add bonus event to book
                     self.add_bonus_event(bonus_type)
                     
-                    # CRITICAL: Set bonus game active and run bonus spins for base game
+                    # CRITICAL: Set bonus game active and run bonus spins for Bonus_Hunt mode
                     self.bonus_game_active = True
                     self.bonus_spins_completed = 0
                     self.total_bonus_win = 0
                     
-                    # Initialize bonus state for base game bonus
+                    # Initialize bonus state for Bonus_Hunt mode bonus
                     if bonus_type == "SUPER_BONK_SPINS":
                         self.events.bonus_state = {
                             "type": "SUPER_BONK_SPINS",
@@ -315,16 +362,19 @@ class GameState(GameStateOverride):
                             "upgraded_from_bonk": False
                         }
                     
-                    # Run bonus spins for base game bonus
+                    # Run bonus spins for Bonus_Hunt mode bonus (same logic as base mode)
                     while self.bonus_game_active and self.events.bonus_state["spins_left"] > 0:
                         
-                        # Set correct gametype based on bonus type to use proper reel set
-                        if bonus_type == "SUPER_BONK_SPINS":
-                            self.gametype = self.config.freegame_type  # Use freegame_type for SUPER_BONK_SPINS
-                        else:
-                            self.gametype = self.config.freegame_type  # Use freegame_type for BONK_SPINS
+                        # Set gametype for bonus spins
+                        self.gametype = self.config.freegame_type
                         
-                        # Create new board for bonus spin
+                        # CRITICAL: Double-check that correct reel set is set for each bonus spin
+                        if bonus_type == "SUPER_BONK_SPINS":
+                            self.events.current_reel_set = "BON2"
+                        else:
+                            self.events.current_reel_set = "BON1"
+                        
+                        # Create new board for bonus spin (will use current_reel_set from events)
                         self.create_board_reelstrips()
                         
                         # Use custom reveal event for bonus spin
@@ -358,12 +408,16 @@ class GameState(GameStateOverride):
                             self.events.bonus_state["multiplier"] = 4
                             self.events.bonus_state["upgraded_from_bonk"] = True
                             self.events.bonus_state["spins_left"] += 5  # Add 5 more spins
+                            
+                            # CRITICAL: Switch to BON2 reels for remaining spins
                             self.events.current_reel_set = "BON2"
-                            # Update gametype to use BON2 reels for future spins
                             self.gametype = self.config.freegame_type
-                    #         # print(f"DEBUG: After upgrade: spins_left: {self.events.bonus_state['spins_left']}")
-                    
-                    # print(f"DEBUG: Bonus spins completed. Total spins: {self.bonus_spins_completed}, final spins_left: {self.events.bonus_state['spins_left'] if self.events.bonus_state else 'None'}")
+                            
+                            # Force board recreation with new reel set
+                            self.create_board_reelstrips()
+                            
+                            # CRITICAL: Create new Bonus_trigger event for the upgrade
+                            self.add_bonus_event("SUPER_BONK_SPINS")
                     
                     # Preserve total bonus win BEFORE ending bonus (end_bonus_game resets totals)
                     final_total_bonus_win = self.total_bonus_win
@@ -372,31 +426,202 @@ class GameState(GameStateOverride):
                     if self.events.bonus_state:
                         self.end_bonus_game()
                     
-                    # Set result to preserved total bonus win for base game
-                    self.result = final_total_bonus_win
+                    # CRITICAL: Reset reel set back to Bonus_Hunt after bonus ends
+                    self.events.current_reel_set = "Bonus_Hunt"
                     
-                    # print(f"DEBUG: Before win manager update - total_bonus_win: {final_total_bonus_win}")
-                    # print(f"DEBUG: Before win manager update - win_manager.freegame_wins: {self.win_manager.freegame_wins}")
+                    # Set result to preserved total bonus win for Bonus_Hunt mode
+                    self.result = final_total_bonus_win
                     
                     # Update win manager for free game wins
                     self.win_manager.reset_spin_win()
                     self.win_manager.update_spinwin(final_total_bonus_win)
                     self.win_manager.update_gametype_wins(self.config.freegame_type)
                     
-                    # print(f"DEBUG: After win manager update - win_manager.freegame_wins: {self.win_manager.freegame_wins}")
-                    # print(f"DEBUG: After win manager update - win_manager.basegame_wins: {self.win_manager.basegame_wins}")
+                    # Set gametype to free for bonus
+                    self.gametype = self.config.freegame_type
+                    
+                    # Update final win to ensure freegame_wins is properly recorded
+                    self.update_final_win()
+                    
+                    # Skip normal base game processing since we handled bonus
+                    continue
+                
+                # Convert result to proper format (fraction, not cents) - same as base mode
+                bet_amount = self.get_current_betmode().get_cost()
+                result_multiplier = result / bet_amount if bet_amount > 0 else 0
+                
+                # Apply win cap for Bonus_Hunt mode
+                if result_multiplier > self.config.wincap:
+                    result_multiplier = self.config.wincap
+                
+                # Update win manager for Bonus_Hunt mode
+                self.win_manager.update_spinwin(result)
+                self.win_manager.update_gametype_wins(self.gametype)
+                
+                # Also update the win_data to ensure proper final calculation
+                self.win_data = {"totalWin": result}
+                
+                # CRITICAL: Call evaluate_finalwin() for Bonus_Hunt mode to set proper payoutMultiplier
+                self.evaluate_finalwin()
+            else:
+                # Normal base game - check for bonus symbols first, then create board with correct reel set
+                # Start with base game reels
+                self.events.current_reel_set = "BR0"
+                
+                # Create initial board for base game
+                self.create_board_reelstrips()
+                
+                # Use custom reveal event for Bonk Boi
+                reveal_event_bonk_boi(self)
+                
+                # Get symbols from the board
+                reels = self.get_board_symbols()
+                
+                # Process base game spin using original logic
+                result, bonus_type = self.events.process_spin(reels)
+                self.result = result
+                
+                # Check for bonus symbols in base game (Bat or Golden Bat)
+                bonus_count = sum(1 for symbol in reels if symbol == "Bat")
+                super_bonus_count = sum(1 for symbol in reels if symbol == "Golden Bat")
+                
+                # Handle bonus if triggered by bonus symbols
+                if bonus_count > 0 or super_bonus_count > 0:
+                    # First, attribute the base spin's win to baseGameWins as multiplier units
+                    bet_amount = self.get_current_betmode().get_cost()
+                    result_multiplier_for_base = result / bet_amount if bet_amount > 0 else 0
+                    self.win_manager.reset_spin_win()
+                    self.win_manager.update_spinwin(result_multiplier_for_base)
+                    self.win_manager.update_gametype_wins(self.config.basegame_type)
+                    
+                    if super_bonus_count > 0:
+                        # Super Bonus symbols trigger SUPER_BONK_SPINS
+                        spins_count = 13 if super_bonus_count == 2 else 10
+                        bonus_type = "SUPER_BONK_SPINS"
+                    else:
+                        # Regular Bonus symbols trigger BONK_SPINS
+                        spins_count = 15 if bonus_count == 2 else 10
+                        bonus_type = "BONK_SPINS"
+                    
+                    # CRITICAL: Set correct reel set BEFORE triggering bonus
+                    if bonus_type == "SUPER_BONK_SPINS":
+                        self.events.current_reel_set = "BON2"
+                    else:
+                        self.events.current_reel_set = "BON1"
+                    
+                    # Trigger bonus (this will use the reel set we just set)
+                    self.events.trigger_bonus(bonus_type, spins_count)
+                    
+                    # Add bonus event to book
+                    self.add_bonus_event(bonus_type)
+                    
+                    # CRITICAL: Set bonus game active and run bonus spins for base game
+                    self.bonus_game_active = True
+                    self.bonus_spins_completed = 0
+                    self.total_bonus_win = 0
+                    
+                    # Initialize bonus state for base game bonus
+                    if bonus_type == "SUPER_BONK_SPINS":
+                        self.events.bonus_state = {
+                            "type": "SUPER_BONK_SPINS",
+                            "spins_left": spins_count,
+                            "total_win": 0,
+                            "symbols_collected": [],
+                            "multiplier": 4,
+                            "sticky_value": None,
+                            "sticky_reel": None,
+                            "upgraded_from_bonk": False
+                        }
+                    else:
+                        self.events.bonus_state = {
+                            "type": "BONK_SPINS",
+                            "spins_left": spins_count,
+                            "total_win": 0,
+                            "symbols_collected": [],
+                            "multiplier": 2,
+                            "upgraded_from_bonk": False
+                        }
+                    
+                    # Run bonus spins for base game bonus
+                    while self.bonus_game_active and self.events.bonus_state["spins_left"] > 0:
+                        
+                        # Set gametype for bonus spins
+                        self.gametype = self.config.freegame_type
+                        
+                        # CRITICAL: Double-check that correct reel set is set for each bonus spin
+                        if bonus_type == "SUPER_BONK_SPINS":
+                            self.events.current_reel_set = "BON2"
+                        else:
+                            self.events.current_reel_set = "BON1"
+                        
+                        # Create new board for bonus spin (will use current_reel_set from events)
+                        self.create_board_reelstrips()
+                        
+                        # Use custom reveal event for bonus spin
+                        reveal_event_bonk_boi(self)
+                        
+                        # Get symbols from board
+                        reels = self.get_board_symbols()
+                        
+                        # Process bonus spin logic
+                        self.events.bonus_state = self.events.process_bonus_spin_logic(
+                            self.events.bonus_state, reels, bonus_type
+                        )
+                        
+                        # Get current spin win and accumulate
+                        current_spin_win = self.events.bonus_state.get("current_spin_win", 0)
+                        self.total_bonus_win += current_spin_win
+                        
+                        # Update bonus state
+                        self.events.bonus_state["total_win"] = self.total_bonus_win
+                        # NOTE: spins_left is decremented in process_bonus_spin_logic, don't decrement here
+                        self.bonus_spins_completed += 1
+                        
+                        # Add bonus spin event
+                        self.add_bonus_spin_event(reels, current_spin_win, bonus_type)
+                        
+                        # Check for upgrade to SUPER_BONK_SPINS
+                        if (bonus_type == "BONK_SPINS" and 
+                            any(symbol == "Golden Bat" for symbol in reels)):
+                            bonus_type = "SUPER_BONK_SPINS"
+                            self.events.bonus_state["type"] = "SUPER_BONK_SPINS"
+                            self.events.bonus_state["multiplier"] = 4
+                            self.events.bonus_state["upgraded_from_bonk"] = True
+                            self.events.bonus_state["spins_left"] += 5  # Add 5 more spins
+                            
+                            # CRITICAL: Switch to BON2 reels for remaining spins
+                            self.events.current_reel_set = "BON2"
+                            self.gametype = self.config.freegame_type
+                            
+                            # Force board recreation with new reel set
+                            self.create_board_reelstrips()
+                            
+                            # CRITICAL: Create new Bonus_trigger event for the upgrade
+                            self.add_bonus_event("SUPER_BONK_SPINS")
+                    
+                    # Preserve total bonus win BEFORE ending bonus (end_bonus_game resets totals)
+                    final_total_bonus_win = self.total_bonus_win
+                    
+                    # End bonus game and add summary
+                    if self.events.bonus_state:
+                        self.end_bonus_game()
+                    
+                    # CRITICAL: Reset reel set back to base game after bonus ends
+                    self.events.current_reel_set = "BR0"
+                    
+                    # Set result to preserved total bonus win for base game
+                    self.result = final_total_bonus_win
+                    
+                    # Update win manager for free game wins
+                    self.win_manager.reset_spin_win()
+                    self.win_manager.update_spinwin(final_total_bonus_win)
+                    self.win_manager.update_gametype_wins(self.config.freegame_type)
                     
                     # Set gametype to free for bonus
                     self.gametype = self.config.freegame_type
                     
                     # Update final win to ensure freegame_wins is properly recorded
-                    # print(f"DEBUG: Before update_final_win - win_manager.freegame_wins: {self.win_manager.freegame_wins}")
-                    # print(f"DEBUG: Before update_final_win - win_manager.basegame_wins: {self.win_manager.basegame_wins}")
-                    
                     self.update_final_win()
-                    
-                    # print(f"DEBUG: After update_final_win - book.freegame_wins: {self.book.freegame_wins}")
-                    # print(f"DEBUG: After update_final_win - book.basegame_wins: {self.book.basegame_wins}")
                     
                     # Skip normal base game processing since we handled bonus
                     continue
@@ -406,9 +631,6 @@ class GameState(GameStateOverride):
                 # we need to convert to bet multiplier (result / bet_amount)
                 bet_amount = self.get_current_betmode().get_cost()
                 result_multiplier = result / bet_amount if bet_amount > 0 else 0
-                
-                # print(f"DEBUG: gamestate.py - result: {result}, bet_amount: {bet_amount}, result_multiplier: {result_multiplier}")
-                # print(f"DEBUG: gamestate.py - BEFORE update_spinwin - running_bet_win: {self.win_manager.running_bet_win}")
                 
                 # Apply win cap for base game
                 if result_multiplier > self.config.wincap:
@@ -420,22 +642,26 @@ class GameState(GameStateOverride):
                     self.win_manager.update_spinwin(result_multiplier)
                     self.win_manager.update_gametype_wins(self.gametype)
                     
-                    # print(f"DEBUG: gamestate.py - AFTER update_spinwin - running_bet_win: {self.win_manager.running_bet_win}")
-                    
                     # Also update the win_data to ensure proper final calculation
                     self.win_data = {"totalWin": result_multiplier}
                 else:
                     # For Horny_Jail mode, win_data should already be set in create_horny_jail_board
-                    # Just ensure win_data is properly set for final calculation
-                    if not hasattr(self, 'win_data') or 'totalWin' not in self.win_data:
+                    # But we need to set it to final_win for proper finalWin.amount display
+                    if hasattr(self, 'final_win'):
+                        self.win_data = {"totalWin": self.final_win}
+                    elif not hasattr(self, 'win_data') or 'totalWin' not in self.win_data:
                         self.win_data = {"totalWin": 0}
             
             # This is crucial - it sets the payoutMultiplier in the book
             # Note: evaluate_finalwin() is now called inside buy bonus block
-            # Skip evaluate_finalwin() for Horny_Jail mode to preserve custom payout_multiplier
+            # For Horny_Jail and Bonus_Hunt modes, call evaluate_finalwin() to create finalWin event
             if not (current_betmode and current_betmode.get_buybonus()):
                 if current_betmode and current_betmode.get_name() == "Horny_Jail":
-                    # For Horny_Jail mode, payout_multiplier is already set in create_horny_jail_board
+                    # For Horny_Jail mode, finalWin event is already created in create_horny_jail_board
+                    # DO NOT call evaluate_finalwin() to avoid duplication
+                    pass
+                elif current_betmode and current_betmode.get_name() == "bonus_hunt":
+                    # For Bonus_Hunt mode, payout_multiplier is already set
                     pass
                 else:
                     self.evaluate_finalwin()
@@ -445,10 +671,6 @@ class GameState(GameStateOverride):
         self.check_repeat()
         
         self.imprint_wins()
-        
-        # print(f"DEBUG: After imprint_wins - book.freegame_wins: {self.book.freegame_wins}")
-        # print(f"DEBUG: After imprint_wins - book.basegame_wins: {self.book.basegame_wins}")
-        # print(f"DEBUG: After imprint_wins - book.payout_multiplier: {self.book.payout_multiplier}")
 
     def get_board_symbols(self):
         """Get symbols from the drawn board (robust for both object and string)"""
@@ -562,6 +784,9 @@ class GameState(GameStateOverride):
                 # Attach using expected keys
                 bonus_spin_event["actualBoard"] = actual_board_symbols
                 bonus_spin_event["stickyBoard"] = sticky_board_symbols
+                
+                # CRITICAL: Add stickReel property to show which reel is sticky
+                bonus_spin_event["stickReel"] = sticky_reel
 
         # Add the bonus spin event to the book
         if bonus_spin_event:

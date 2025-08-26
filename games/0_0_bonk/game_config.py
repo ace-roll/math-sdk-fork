@@ -47,27 +47,8 @@ class GameConfig(Config):
             "scatter": []  # No scatter symbols in this game, but needed to prevent KeyError
         }
         
-        # Reel strips - now supporting BR0, BON1, BON2, and Bonus_Hunt
-        self.reel_strips = {
-            "base": {
-                "reels": ["games/0_0_bonk/reels/BR0.csv", "games/0_0_bonk/reels/BR0.csv"]
-            },
-            "free": {
-                "reels": ["games/0_0_bonk/reels/BON1.csv", "games/0_0_bonk/reels/BON1.csv"]
-            },
-            "bonus1": {
-                "reels": ["games/0_0_bonk/reels/BON1.csv", "games/0_0_bonk/reels/BON1.csv"]
-            },
-            "bonus2": {
-                "reels": ["games/0_0_bonk/reels/BON2.csv", "games/0_0_bonk/reels/BON2.csv"]
-            },
-            "Bonus_Hunt": {
-                "reels": ["games/0_0_bonk/reels/Bonus_Hunt.csv", "games/0_0_bonk/reels/Bonus_Hunt.csv"]
-            },
-            "Horny_Jail": {
-                "reels": ["games/0_0_bonk/reels/Horny_Jail.csv", "games/0_0_bonk/reels/Horny_Jail.csv"]
-            }
-        }
+        # Note: reel_strips is deprecated, using self.reels instead
+        # All reel configurations are now in self.reels
         
         # Bet modes
         self.bet_modes = [
@@ -94,7 +75,7 @@ class GameConfig(Config):
             ),
             BetMode(
                 name="bonus_hunt",
-                cost=1.0,
+                cost=3.5,
                 rtp=0.96,
                 max_win=5000.0,  # Максимальний виграш 5000x
                 auto_close_disabled=False,
@@ -106,9 +87,9 @@ class GameConfig(Config):
                         quota=1,
                         win_criteria=None,
                         conditions={
-                            "reel_weights": {self.basegame_type: {"Bonus_Hunt": 1}, self.freegame_type: {"Bonus_Hunt": 1}},
+                            "reel_weights": {self.basegame_type: {"Bonus_Hunt": 1}},
                             "force_wincap": False,
-                            "force_freegame": False,
+                            "force_freegame": False,  # НЕ запускати фрігейми
                         }
                     )
                 ]
@@ -127,58 +108,18 @@ class GameConfig(Config):
                         quota=1,
                         win_criteria=None,
                         conditions={
-                            "reel_weights": {self.basegame_type: {"Horny_Jail": 1}, self.freegame_type: {"Horny_Jail": 1}},
+                            "reel_weights": {self.basegame_type: {"Horny_Jail": 1}},
                             "force_wincap": False,
                             "force_freegame": False,
                         }
                     )
                 ]
             ),
-            BetMode(
-                name="bonus1",
-                cost=1.0,
-                rtp=0.96,
-                max_win=5000.0,
-                auto_close_disabled=False,
-                is_feature=True,
-                is_buybonus=False,
-                distributions=[
-                    Distribution(
-                        criteria="0",
-                        quota=1,
-                        win_criteria=None,
-                        conditions={
-                            "reel_weights": {self.basegame_type: {"BON1": 1}, self.freegame_type: {"BON1": 1}},
-                            "force_wincap": False,
-                            "force_freegame": False,
-                        }
-                    )
-                ]
-            ),
-            BetMode(
-                name="bonus2",
-                cost=1.0,
-                rtp=0.96,
-                max_win=5000.0,
-                auto_close_disabled=False,
-                is_feature=True,
-                is_buybonus=False,
-                distributions=[
-                    Distribution(
-                        criteria="0",
-                        quota=1,
-                        win_criteria=None,
-                        conditions={
-                            "reel_weights": {self.basegame_type: {"BON2": 1}, self.freegame_type: {"BON2": 1}},
-                            "force_wincap": False,
-                            "force_freegame": False,
-                        }
-                    )
-                ]
-            ),
+
+
             BetMode(
                 name="buy_bonk_spins",
-                cost=10.0,
+                cost=60.0,
                 rtp=0.96,
                 max_win=5000.0,
                 auto_close_disabled=False,
@@ -199,7 +140,7 @@ class GameConfig(Config):
             ),
             BetMode(
                 name="buy_super_bonk_spins",
-                cost=25.0,  # Вища вартість для супер-бонусу
+                cost=350.0,  # Вища вартість для супер-бонусу
                 rtp=0.96,
                 max_win=5000.0,
                 auto_close_disabled=False,
@@ -246,14 +187,14 @@ class GameConfig(Config):
         
         # Load all reel data files
         base_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BR0.csv")
-        bonus1_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON1.csv")
-        bonus2_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON2.csv")
+        bon1_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON1.csv")
+        bon2_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON2.csv")
         bonus_hunt_reel_path = os.path.join(os.path.dirname(__file__), "reels", "Bonus_Hunt.csv")
         horny_jail_reel_path = os.path.join(os.path.dirname(__file__), "reels", "Horny_Jail.csv")
         
         base_reel_symbols = self.read_single_column_csv(base_reel_path)
-        bonus1_reel_symbols = self.read_single_column_csv(bonus1_reel_path)
-        bonus2_reel_symbols = self.read_single_column_csv(bonus2_reel_path)
+        bon1_reel_symbols = self.read_single_column_csv(bon1_reel_path)
+        bon2_reel_symbols = self.read_single_column_csv(bon2_reel_path)
         bonus_hunt_reel_symbols = self.read_single_column_csv(bonus_hunt_reel_path)
         horny_jail_reel_symbols = self.read_single_column_csv(horny_jail_reel_path)
         
@@ -261,11 +202,11 @@ class GameConfig(Config):
         # BR0 for base game (with Bat bonuses)
         self.reels["BR0"] = [base_reel_symbols, base_reel_symbols]  # 2 reels, both using same symbols
         
-        # BON1 for first bonus game (Bat: 50, Golden Bat: 10)
-        self.reels["BON1"] = [bonus1_reel_symbols, bonus1_reel_symbols]  # 2 reels, both using same symbols
+        # BON1 for first bonus game (used by buy_bonk_spins)
+        self.reels["BON1"] = [bon1_reel_symbols, bon1_reel_symbols]  # 2 reels, both using same symbols
         
-        # BON2 for second bonus game (Bat: 0, Golden Bat: 10)
-        self.reels["BON2"] = [bonus2_reel_symbols, bonus2_reel_symbols]  # 2 reels, both using same symbols
+        # BON2 for second bonus game (used by buy_super_bonk_spins)
+        self.reels["BON2"] = [bon2_reel_symbols, bon2_reel_symbols]  # 2 reels, both using same symbols
         
         # Bonus_Hunt: custom base-like reel set with different distribution
         self.reels["Bonus_Hunt"] = [bonus_hunt_reel_symbols, bonus_hunt_reel_symbols]
@@ -273,13 +214,15 @@ class GameConfig(Config):
         # Horny_Jail: special mode — first reel fixed to "1000", second reel spins normally
         self.reels["Horny_Jail"] = [["1000"], horny_jail_reel_symbols]
         
-        # Add free game reels (same as BON1)
-        self.reels["free"] = [bonus1_reel_symbols, bonus1_reel_symbols]  # 2 reels with BON1 for bonus games
+        # Note: free game reels are dynamically selected based on bonus type:
+        # - BONK_SPINS uses BON1 reels
+        # - SUPER_BONK_SPINS uses BON2 reels
+        # This is handled in game_events.py
 
         # Set up padding reels for standard system - use proper format
         self.padding_reels = {}
         self.padding_reels[self.basegame_type] = [base_reel_symbols, base_reel_symbols]  # 2 reels with BR0
-        self.padding_reels[self.freegame_type] = [bonus1_reel_symbols, bonus1_reel_symbols]  # 2 reels with BON1 for bonus games
+        # Note: freegame_type padding reels are dynamically selected based on bonus type
         
         # Add Horny_Jail padding reels (first reel fixed)
         self.padding_reels["Horny_Jail"] = [["1000"], horny_jail_reel_symbols]

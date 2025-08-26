@@ -237,7 +237,7 @@ class BonkBoiEvents:
         def get_symbol_value(symbol):
             if symbol == "Bat" or symbol == "Golden Bat":
                 return 0
-            elif symbol in ["1", "2", "3", "4", "5"]:
+            elif symbol in ["1", "2", "3", "5", "10", "25", "50", "100", "250", "500", "1000"]:
                 return int(symbol)
             else:
                 return 0
@@ -486,7 +486,7 @@ class BonkBoiEvents:
         def get_symbol_value(symbol):
             if symbol == "Bat" or symbol == "Golden Bat":
                 return 1
-            elif symbol in ["1", "2", "3", "4", "5"]:
+            elif symbol in ["1", "2", "3", "5", "10", "25", "50", "100", "250", "500", "1000"]:
                 return int(symbol)
             else:
                 return 0
@@ -512,6 +512,56 @@ class BonkBoiEvents:
             except ValueError:
                 return 0
 
+    def calculate_horny_jail_win(self, reels):
+        """Calculate win for Horny_Jail mode: 1000 × second reel symbol"""
+        if len(reels) < 2:
+            return 0
+            
+        # First reel should always be "1000" in Horny_Jail mode
+        first_reel = reels[0]
+        second_reel = reels[1]
+        
+        # Verify first reel is "1000"
+        if first_reel != "1000":
+            print(f"WARNING: Horny_Jail first reel should be '1000', got '{first_reel}'")
+            return 0
+        
+        # Get numeric value of second reel
+        try:
+            second_value = int(second_reel)
+            # Win = 1000 × second reel value
+            return 1000 * second_value
+        except ValueError:
+            print(f"WARNING: Horny_Jail second reel should be '1000', got '{second_reel}'")
+            return 0
+
+    def calculate_bonus_hunt_win(self, reels):
+        """Calculate win for Bonus_Hunt mode: multiply two symbols (SAME as base mode with 1x1=0 rule)"""
+        if len(reels) < 2:
+            return 0
+
+        symbol1 = reels[0]
+        symbol2 = reels[1]
+
+        # Get numeric values - Bat and Golden Bat are always 1 in all modes
+        def get_symbol_value(symbol):
+            if symbol == "Bat" or symbol == "Golden Bat":
+                return 1
+            elif symbol in ["1", "2", "3", "5", "10", "25", "50", "100", "250", "500", "1000"]:
+                return int(symbol)
+            else:
+                return 0
+        
+        mult1 = get_symbol_value(symbol1)
+        mult2 = get_symbol_value(symbol2)
+        
+        # Apply the 1x1=0 rule (same as base mode)
+        if mult1 == 1 and mult2 == 1:
+            return 0  # 1x1=0 rule applies
+        
+        win = mult1 * mult2
+        return win
+
 
 def reveal_event_bonk_boi(gamestate):
     """Create reveal event for Bonk Boi game"""
@@ -536,9 +586,8 @@ def reveal_event_bonk_boi(gamestate):
             symbol_obj = type('Symbol', (), {'name': symbol_name})()
             custom_board.append([symbol_obj])
         gamestate.board = custom_board
-    elif gamestate.gametype != "free":
-        # Only create board for non-free gametypes (base, bonus1, bonus2)
-        gamestate.create_board_reelstrips()
+    # Note: For non-buy bonus modes, board is already created by gamestate.create_board_reelstrips()
+    # so we don't need to call it again here
     
     # Convert board to JSON-ready format
     board_client = []
