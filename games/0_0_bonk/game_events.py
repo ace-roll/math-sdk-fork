@@ -223,6 +223,11 @@ class BonkBoiEvents:
         # Store current spin win for gamestate to use
         bonus_state["current_spin_win"] = spin_win
         
+        # Check for maxwin limit (1,000,000)
+        if bonus_state["total_win"] >= 1000000:
+            bonus_state["maxwin_reached"] = True
+            bonus_state["spins_left"] = 0  # Stop bonus game
+        
         return bonus_state
 
     def process_super_bonk_spin(self, bonus_state: dict, reel_symbols: list) -> dict:
@@ -233,10 +238,10 @@ class BonkBoiEvents:
         if "sticky_reel" not in bonus_state:
             bonus_state["sticky_reel"] = None
             
-        # Get numeric values from reels (Bat and Golden Bat = 0 in SUPER_BONK_SPINS mode)
+        # Get numeric values from reels (Bat = 0, Golden Bat = 1 in SUPER_BONK_SPINS mode)
         def get_symbol_value(symbol):
             if symbol == "Bat" or symbol == "Golden Bat":
-                return 0
+                return 1
             elif symbol in ["1", "2", "3", "5", "10", "25", "50", "100", "250", "500", "1000"]:
                 return int(symbol)
             else:
@@ -310,6 +315,11 @@ class BonkBoiEvents:
         
         bonus_state["spins_left"] += bonus_spins_added
         
+        # Check for maxwin limit (1,000,000)
+        if bonus_state["total_win"] >= 1000000:
+            bonus_state["maxwin_reached"] = True
+            bonus_state["spins_left"] = 0  # Stop bonus game
+        
         return bonus_state
 
     def calculate_bonus_win(self, symbols: list, bonus_type: str) -> int:
@@ -318,18 +328,18 @@ class BonkBoiEvents:
         
         # Define symbol values for different bonus types
         if bonus_type == "BONK_SPINS":
-            # BON1: Bat=50, Golden Bat=10
+            # BON1: Bat=0, Golden Bat=0 (не дають виграшу, тільки додаткові спіни)
             bonus_symbols = {
                 "1": 1, "2": 2, "3": 3, "5": 5, "10": 10,
                 "25": 25, "50": 50, "100": 100, "250": 250,
-                "500": 500, "1000": 1000, "Bat": 50, "Golden Bat": 10
+                "500": 500, "1000": 1000, "Bat": 0, "Golden Bat": 0
             }
         elif bonus_type == "SUPER_BONK_SPINS":
-            # BON2: Bat=0, Golden Bat=10
+            # BON2: Bat=0, Golden Bat=1 (Golden Bat дає виграш 1, але не додаткові спіни)
             bonus_symbols = {
                 "1": 1, "2": 2, "3": 3, "5": 5, "10": 10,
                 "25": 25, "50": 50, "100": 100, "250": 250,
-                "500": 500, "1000": 1000, "Bat": 0, "Golden Bat": 10
+                "500": 500, "1000": 1000, "Bat": 1, "Golden Bat": 1
             }
         else:
             return 0
@@ -342,6 +352,9 @@ class BonkBoiEvents:
     def is_bonus_complete(self):
         """Check if current bonus game is complete"""
         if self.bonus_state:
+            # Check for maxwin limit first
+            if self.bonus_state.get("maxwin_reached", False):
+                return True
             return self.bonus_state["spins_left"] <= 0
         return (self.bonus_spins_left <= 0 and self.super_bonus_mode == False) or (self.bonus_spins_left <= 0 and self.bonus_mode == False)
 
@@ -354,6 +367,16 @@ class BonkBoiEvents:
                 "symbols_collected": self.bonus_state["symbols_collected"],
                 "final_multiplier": self.bonus_state["multiplier"]
             }
+            
+            # Add maxwin information if reached
+            if self.bonus_state.get("maxwin_reached", False):
+                summary["maxwin_reached"] = True
+                summary["maxwin_amount"] = 1000000
+                summary["reason"] = "maxwin_limit"
+            else:
+                summary["maxwin_reached"] = False
+                summary["reason"] = "spins_completed"
+            
             return summary
         return None
 
@@ -475,14 +498,14 @@ class BonkBoiEvents:
             return 0
 
     def calculate_bonus_spin_win(self, reels):
-        """Calculate win for bonus spins where Bat and Golden Bat = 1"""
+        """Calculate win for bonus spins where Bat and Golden Bat = 0 (не дають виграшу)"""
         if len(reels) < 2:
             return 0
             
         symbol1 = reels[0]
         symbol2 = reels[1]
         
-        # Get numeric values - Bat and Golden Bat are always 1 in all modes
+        # Get numeric values - Bat and Golden Bat are always 0 (не дають виграшу)
         def get_symbol_value(symbol):
             if symbol == "Bat" or symbol == "Golden Bat":
                 return 1
@@ -502,10 +525,8 @@ class BonkBoiEvents:
 
     def get_symbol_value(self, symbol):
         """Get numeric value of symbol for SUPER_BONK_SPINS"""
-        if symbol == "Golden Bat":
-            return 10
-        elif symbol == "Bat":
-            return 0  # Bat = 0 in SUPER_BONK_SPINS
+        if symbol in ["Golden Bat", "Bat"]:
+            return 0  # Golden Bat та Bat = 0 в SUPER_BONK_SPINS (не дають виграшу)
         else:
             try:
                 return int(symbol)

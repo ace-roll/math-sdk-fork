@@ -268,7 +268,14 @@ def output_lookup_and_force_files(
 
 def write_json(gamestate, filename: str):
     """Convert the list of dictionaries to a JSON-encoded string and compress it in chunks."""
-    json_objects = [json.dumps(item) for item in gamestate.library.values()]
+    # Convert Symbol objects to strings before JSON serialization
+    json_objects = []
+    for item in gamestate.library.values():
+        if hasattr(item, 'name'):  # If it's a Symbol object
+            json_objects.append(json.dumps({"name": item.name}))
+        else:
+            json_objects.append(json.dumps(item))
+    
     combined_data = "\n".join(json_objects) + "\n"
 
     if filename.endswith(".zst"):

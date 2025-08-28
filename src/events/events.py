@@ -212,6 +212,7 @@ def final_win_event(gamestate):
         "type": EventConstants.FINAL_WIN.value,
         "amount": int(round(min(gamestate.final_win, gamestate.config.wincap) * 100, 0)),
     }
+    
     gamestate.book.add_event(event)
 
 

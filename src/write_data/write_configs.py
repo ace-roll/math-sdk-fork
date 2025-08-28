@@ -61,14 +61,26 @@ def make_index_config(gamestate: object):
         f.write(json.dumps(manifest_object, indent=4))
 
 
-def pass_fe_betmode(betmode):
-    """Generate frontend configuration json file."""
+def pass_fe_betmode(betmode, config=None):
+    """Generate frontend configuration json file with bet limits."""
     mode_info = {}
     mode_info["cost"] = betmode.get_cost()
     mode_info["feature"] = betmode.get_feature()
     mode_info["buyBonus"] = betmode.get_buybonus()
     mode_info["rtp"] = betmode.get_rtp()
     mode_info["max_win"] = betmode.get_wincap()
+    
+    # Додаємо обмеження ставок якщо config має bet_ranges
+    if config and hasattr(config, 'bet_ranges'):
+        mode_name = betmode.get_name()
+        if mode_name in config.bet_ranges:
+            bet_range = config.bet_ranges[mode_name]
+            mode_info["betLimits"] = {
+                "minBet": config.min_denomination * bet_range["min_multiplier"],
+                "maxBet": config.min_denomination * bet_range["max_multiplier"],
+                "minMultiplier": bet_range["min_multiplier"],
+                "maxMultiplier": bet_range["max_multiplier"]
+            }
 
     return {betmode.get_name(): mode_info}
 
@@ -242,9 +254,18 @@ def make_fe_config(gamestate, json_padding=True, assign_properties=True, **kwarg
 
     json_info["betModes"] = {}
     for betmode in gamestate.config.bet_modes:
-        bm_info = pass_fe_betmode(betmode)
+        # Передаємо config для доступу до bet_ranges
+        bm_info = pass_fe_betmode(betmode, gamestate.config)
         m_name = next(iter(bm_info))
         json_info["betModes"][m_name] = bm_info[m_name]
+    
+    # Додаємо глобальні обмеження ставок
+    if hasattr(gamestate.config, 'max_denomination'):
+        json_info["betLimits"] = {
+            "minDenomination": gamestate.config.min_denomination,
+            "maxDenomination": gamestate.config.max_denomination,
+            "globalBetRanges": gamestate.config.get_all_bet_ranges()
+        }
 
     # Optionally include any custom information
     for key, val in kwargs:
@@ -312,6 +333,11 @@ def make_be_config(gamestate):
         be_info["rtp"] = config.rtp
     be_info["betDenomination"] = int(config.min_denomination * 100 * 100)
     be_info["minDenomination"] = int(config.min_denomination * 100)
+    
+    # Додаємо максимальну ставку
+    if hasattr(config, 'max_denomination'):
+        be_info["maxDenomination"] = int(config.max_denomination * 100)
+    
     be_info["providerNumber"] = int(config.provider_number)
     be_info["standardForceFile"] = {
         "file": "force.json",
@@ -365,6 +391,15 @@ def make_be_config(gamestate):
             "sha256": force_sha,
         }
         be_info["bookShelfConfig"].append(dic)
+
+    # Додаємо діапазони ставок для режимів
+    if hasattr(config, 'bet_ranges'):
+        be_info["betRanges"] = {}
+        for mode_name, bet_range in config.bet_ranges.items():
+            be_info["betRanges"][mode_name] = {
+                "minBet": int(config.min_denomination * bet_range["min_multiplier"] * 100),
+                "maxBet": int(config.min_denomination * bet_range["max_multiplier"] * 100)
+            }
 
     file = open(gamestate.output_files.configs["paths"]["be_config"], "w", encoding="UTF-8")
     file.write(json.dumps(be_info, indent=4))

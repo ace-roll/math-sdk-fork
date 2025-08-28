@@ -23,8 +23,21 @@ class GameConfig(Config):
         self.num_reels = 2
         self.num_rows = [1, 1]  # 1 row per reel
         
-        # Win cap - максимальний виграш 5000x
-        self.wincap = 5000.0
+        # Win cap - максимальний виграш 10,000,000x (абсолютний максимум)
+        self.wincap = 10000000.0
+        
+        # Bet limits - обмеження для ставок
+        self.min_denomination = 0.1  # Мінімальна ставка 0.1
+        self.max_denomination = 10.0  # Максимальна ставка 10.0
+        
+        # Bet ranges для кожного режиму (множники від базової ставки)
+        self.bet_ranges = {
+            "base": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 10.0
+            "bonus_hunt": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 5.0
+            "Horny_Jail": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 1.0
+            "buy_bonk_spins": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 2.0
+            "buy_super_bonk_spins": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 1.0
+        }
         
         # Paytable - multiplier values (правильні мультиплікатори)
         self.paytable = {
@@ -56,7 +69,7 @@ class GameConfig(Config):
                 name="base",
                 cost=1.0,
                 rtp=0.96,
-                max_win=5000.0,  # Максимальний виграш 5000x
+                max_win=1000000.0,  # Максимальний виграш 5000x (обмежує BR0 барабани)
                 auto_close_disabled=False,
                 is_feature=False,
                 is_buybonus=False,
@@ -75,9 +88,9 @@ class GameConfig(Config):
             ),
             BetMode(
                 name="bonus_hunt",
-                cost=3.5,
+                cost=3.0,
                 rtp=0.96,
-                max_win=5000.0,  # Максимальний виграш 5000x
+                max_win=1000000.0,  # Максимальний виграш 1,000,000x (обмежує Bonus_Hunt барабани)
                 auto_close_disabled=False,
                 is_feature=False,
                 is_buybonus=False,
@@ -98,7 +111,7 @@ class GameConfig(Config):
                 name="Horny_Jail",
                 cost=20000.0,  # Вартість 20000
                 rtp=0.96,
-                max_win=1000000.0,  # Максимальний виграш 1000x (1000 × 1000)
+                max_win=1000000.0,  # Максимальний виграш 1,000,000x (1000 × 1000)
                 auto_close_disabled=False,
                 is_feature=False,
                 is_buybonus=False,
@@ -119,9 +132,9 @@ class GameConfig(Config):
 
             BetMode(
                 name="buy_bonk_spins",
-                cost=60.0,
+                cost=40.0,
                 rtp=0.96,
-                max_win=5000.0,
+                max_win=1000000.0,  # Максимальний виграш 1,000,000x (обмежує BON1 барабани)
                 auto_close_disabled=False,
                 is_feature=True,
                 is_buybonus=True,  # Це режим покупки бонусу
@@ -140,9 +153,9 @@ class GameConfig(Config):
             ),
             BetMode(
                 name="buy_super_bonk_spins",
-                cost=350.0,  # Вища вартість для супер-бонусу
+                cost=200.0,  # Вища вартість для супер-бонусу
                 rtp=0.96,
-                max_win=5000.0,
+                max_win=1000000.0,  # Максимальний виграш 1,000,000x (обмежує BON2 барабани)
                 auto_close_disabled=False,
                 is_feature=True,
                 is_buybonus=True,  # Режим покупки бонусу
@@ -189,12 +202,16 @@ class GameConfig(Config):
         base_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BR0.csv")
         bon1_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON1.csv")
         bon2_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON2.csv")
+        bon2_run_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON2_run.csv")
+        bon2_stick_reel_path = os.path.join(os.path.dirname(__file__), "reels", "BON2_stick.csv")
         bonus_hunt_reel_path = os.path.join(os.path.dirname(__file__), "reels", "Bonus_Hunt.csv")
         horny_jail_reel_path = os.path.join(os.path.dirname(__file__), "reels", "Horny_Jail.csv")
         
         base_reel_symbols = self.read_single_column_csv(base_reel_path)
         bon1_reel_symbols = self.read_single_column_csv(bon1_reel_path)
         bon2_reel_symbols = self.read_single_column_csv(bon2_reel_path)
+        bon2_run_reel_symbols = self.read_single_column_csv(bon2_run_reel_path)
+        bon2_stick_reel_symbols = self.read_single_column_csv(bon2_stick_reel_path)
         bonus_hunt_reel_symbols = self.read_single_column_csv(bonus_hunt_reel_path)
         horny_jail_reel_symbols = self.read_single_column_csv(horny_jail_reel_path)
         
@@ -208,6 +225,12 @@ class GameConfig(Config):
         # BON2 for second bonus game (used by buy_super_bonk_spins)
         self.reels["BON2"] = [bon2_reel_symbols, bon2_reel_symbols]  # 2 reels, both using same symbols
         
+        # BON2_run for non-sticky reels in SUPER_BONK_SPINS (can have Golden Bat)
+        self.reels["BON2_run"] = [bon2_run_reel_symbols, bon2_run_reel_symbols]  # 2 reels, both using same symbols
+        
+        # BON2_stick for sticky reels in SUPER_BONK_SPINS (only numeric symbols, no Golden Bat)
+        self.reels["BON2_stick"] = [bon2_stick_reel_symbols, bon2_stick_reel_symbols]  # 2 reels, both using same symbols
+        
         # Bonus_Hunt: custom base-like reel set with different distribution
         self.reels["Bonus_Hunt"] = [bonus_hunt_reel_symbols, bonus_hunt_reel_symbols]
         
@@ -217,7 +240,10 @@ class GameConfig(Config):
         # Note: free game reels are dynamically selected based on bonus type:
         # - BONK_SPINS uses BON1 reels
         # - SUPER_BONK_SPINS uses BON2 reels
-        # This is handled in game_events.py
+        # - When a reel becomes sticky in SUPER_BONK_SPINS:
+        #   * Sticky reel uses BON2_stick (numeric only)
+        #   * Non-sticky reel uses BON2_run (can have Golden Bat)
+        # This is handled in game_events.py and game_override.py
 
         # Set up padding reels for standard system - use proper format
         self.padding_reels = {}
@@ -226,6 +252,102 @@ class GameConfig(Config):
         
         # Add Horny_Jail padding reels (first reel fixed)
         self.padding_reels["Horny_Jail"] = [["1000"], horny_jail_reel_symbols]
+
+    def validate_bet(self, bet_amount: float, mode_name: str = "base") -> dict:
+        """
+        Валідує ставку для конкретного режиму гри
+        
+        Args:
+            bet_amount: Розмір ставки
+            mode_name: Назва режиму гри
+            
+        Returns:
+            dict: Результат валідації з деталями
+        """
+        result = {
+            "is_valid": False,
+            "error_message": "",
+            "min_allowed": 0.0,
+            "max_allowed": 0.0,
+            "suggested_bet": 0.0
+        }
+        
+        # Перевіряємо чи існує режим
+        if mode_name not in self.bet_ranges:
+            result["error_message"] = f"Невідомий режим гри: {mode_name}"
+            return result
+        
+        # Отримуємо діапазон ставок для режиму
+        bet_range = self.bet_ranges[mode_name]
+        min_multiplier = bet_range["min_multiplier"]
+        max_multiplier = bet_range["max_multiplier"]
+        
+        # Розраховуємо дозволені ставки
+        min_allowed = self.min_denomination * min_multiplier
+        max_allowed = self.min_denomination * max_multiplier
+        
+        result["min_allowed"] = min_allowed
+        result["max_allowed"] = max_allowed
+        
+        # Перевіряємо мінімальну ставку
+        if bet_amount < min_allowed:
+            result["error_message"] = f"Ставка {bet_amount} занадто мала. Мінімум: {min_allowed}"
+            result["suggested_bet"] = min_allowed
+            return result
+        
+        # Перевіряємо максимальну ставку
+        if bet_amount > max_allowed:
+            result["error_message"] = f"Ставка {bet_amount} занадто велика. Максимум: {max_allowed}"
+            result["suggested_bet"] = max_allowed
+            return result
+        
+        # Перевіряємо глобальні обмеження
+        if bet_amount < self.min_denomination:
+            result["error_message"] = f"Ставка {bet_amount} менша за глобальний мінімум: {self.min_denomination}"
+            result["suggested_bet"] = self.min_denomination
+            return result
+        
+        if bet_amount > self.max_denomination:
+            result["error_message"] = f"Ставка {bet_amount} більша за глобальний максимум: {self.max_denomination}"
+            result["suggested_bet"] = self.max_denomination
+            return result
+        
+        # Ставка валідна
+        result["is_valid"] = True
+        return result
+    
+    def get_bet_range(self, mode_name: str = "base") -> dict:
+        """
+        Повертає діапазон ставок для конкретного режиму
+        
+        Args:
+            mode_name: Назва режиму гри
+            
+        Returns:
+            dict: Діапазон ставок
+        """
+        if mode_name not in self.bet_ranges:
+            return {"min": 0.0, "max": 0.0, "error": f"Невідомий режим: {mode_name}"}
+        
+        bet_range = self.bet_ranges[mode_name]
+        return {
+            "min": self.min_denomination * bet_range["min_multiplier"],
+            "max": self.min_denomination * bet_range["max_multiplier"],
+            "min_multiplier": bet_range["min_multiplier"],
+            "max_multiplier": bet_range["max_multiplier"]
+        }
+    
+    def get_all_bet_ranges(self) -> dict:
+        """
+        Повертає всі діапазони ставок для всіх режимів
+        
+        Returns:
+            dict: Всі діапазони ставок
+        """
+        all_ranges = {}
+        for mode_name in self.bet_ranges:
+            all_ranges[mode_name] = self.get_bet_range(mode_name)
+        return all_ranges
 
     def read_single_column_csv(self, file_path):
         """Read single column CSV file (one symbol per line)"""

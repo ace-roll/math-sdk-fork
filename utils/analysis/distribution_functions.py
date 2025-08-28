@@ -44,12 +44,16 @@ def get_distribution_moments(dist: dict) -> float:
 
     skewness, kurtosis = 0.0, 0.0
     av_win = float(av_win)
-    for win, weight in dist.items():
-        skewness += ((win - av_win) ** 3) * weight
-        kurtosis += ((win - av_win) ** 4) * weight
-    skewness /= (standard_dev) ** 3
-    kurtosis /= (standard_dev) ** 4
-    kurtosis -= 3
+    
+    # Only calculate skewness and kurtosis if standard_dev > 0
+    if standard_dev > 0:
+        for win, weight in dist.items():
+            skewness += ((win - av_win) ** 3) * weight
+            kurtosis += ((win - av_win) ** 4) * weight
+        skewness /= (standard_dev) ** 3
+        kurtosis /= (standard_dev) ** 4
+        kurtosis -= 3
+    # If standard_dev == 0, skewness and kurtosis remain 0.0
 
     return variance, standard_dev, skewness, kurtosis
 

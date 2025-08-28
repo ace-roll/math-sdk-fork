@@ -51,6 +51,25 @@ class GameStateOverride(GameExecutables):
             super().create_board_reelstrips()
             return
         
+        # Check if we're in SUPER_BONK_SPINS mode and need to use sticky reels
+        if (hasattr(self, 'events') and 
+            hasattr(self.events, 'bonus_state') and 
+            self.events.bonus_state and 
+            self.events.bonus_state.get('type') == 'SUPER_BONK_SPINS' and
+            self.events.bonus_state.get('sticky_reel') is not None):
+            
+            # Use sticky reel logic for SUPER_BONK_SPINS
+            sticky_reel = self.events.bonus_state.get('sticky_reel')
+            self.board = self.create_sticky_board_from_reel_strips(sticky_reel)
+            # Set padding positions for events
+            import random
+            self.padding_position = [random.randint(0, 50000), random.randint(0, 50000)]
+        else:
+            # Use regular reel logic
+            self.create_regular_board_from_reel_strips()
+
+    def create_regular_board_from_reel_strips(self):
+        """Create board using regular reel strips (BON2.csv for SUPER_BONK_SPINS)."""
         # Create board manually using current_reel_strips
         self.board = []
         
@@ -61,10 +80,6 @@ class GameStateOverride(GameExecutables):
         # Select random symbols from each reel
         import random
         
-        # reel1_symbols = [x for x in reel1_symbols if x.isnumeric()]
-        # reel2_symbols = [x for x in reel2_symbols if x.isnumeric()]
-        # reel1_symbols = sorted(set(reel1_symbols))
-        # reel2_symbols = sorted(set(reel2_symbols))
         # First reel
         symbol1_name = random.choice(reel1_symbols)
         symbol1_obj = type('Symbol', (), {'name': str(symbol1_name)})()
@@ -75,10 +90,59 @@ class GameStateOverride(GameExecutables):
         symbol2_obj = type('Symbol', (), {'name': str(symbol2_name)})()
         self.board.append([symbol2_obj])
 
-        # print(symbol1_name, symbol2_name)
-        
         # Set padding positions for events
         self.padding_position = [random.randint(0, 50000), random.randint(0, 50000)]
+
+    def create_sticky_board_from_reel_strips(self, sticky_reel):
+        """
+        Create a board with one sticky reel (BON2_stick) and one non-sticky reel (BON2_run)
+        """
+        import random
+        
+        # Get sticky reel symbols (BON2_stick.csv - only numeric)
+        all_sticky_reel_strips = self.config.reels.get("BON2_stick", [])
+        if not all_sticky_reel_strips:
+            # Fallback to regular BON2 if BON2_stick not available
+            sticky_reel_symbols = self.current_reel_strips[sticky_reel]
+        else:
+            sticky_reel_symbols = all_sticky_reel_strips[sticky_reel]
+        
+        # Get non-sticky reel symbols (BON2_run.csv - can have Golden Bat)
+        non_sticky_reel = 1 if sticky_reel == 0 else 0
+        all_non_sticky_reel_strips = self.config.reels.get("BON2_run", [])
+        if not all_non_sticky_reel_strips:
+            # Fallback to regular BON2 if BON2_run not available
+            non_sticky_reel_symbols = self.current_reel_strips[non_sticky_reel]
+        else:
+            non_sticky_reel_symbols = all_non_sticky_reel_strips[non_sticky_reel]
+        
+        # Create board with sticky and non-sticky reels
+        if sticky_reel == 0:
+            # Sticky reel is first reel (index 0)
+            symbol1_name = random.choice(sticky_reel_symbols)
+            symbol2_name = random.choice(non_sticky_reel_symbols)
+            
+            symbol1_obj = type('Symbol', (), {'name': str(symbol1_name)})()
+            symbol2_obj = type('Symbol', (), {'name': str(symbol2_name)})()
+            
+            board = [
+                [symbol1_obj],  # Sticky reel (numeric only)
+                [symbol2_obj]   # Non-sticky reel (can have Golden Bat)
+            ]
+        else:
+            # Sticky reel is second reel (index 1)
+            symbol1_name = random.choice(non_sticky_reel_symbols)
+            symbol2_name = random.choice(sticky_reel_symbols)
+            
+            symbol1_obj = type('Symbol', (), {'name': str(symbol1_name)})()
+            symbol2_obj = type('Symbol', (), {'name': str(symbol2_name)})()
+            
+            board = [
+                [symbol1_obj],  # Non-sticky reel (can have Golden Bat)
+                [symbol2_obj]   # Sticky reel (numeric only)
+            ]
+        
+        return board
 
     def set_reel_set(self, reel_set):
         """Set the current reel set and update game state."""

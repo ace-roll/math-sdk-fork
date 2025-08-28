@@ -22,6 +22,7 @@ class Config:
 
         # Win information
         self.min_denomination = 0.1
+        self.max_denomination = 10.0  # Максимальна ставка за замовчуванням
         self.wincap = 5000
 
         # Game details
@@ -166,3 +167,34 @@ class Config:
                 paytable[(i, symbol)] = payout
 
         return paytable
+
+    def get_bet_ranges(self) -> dict:
+        """Повертає базові діапазони ставок (може бути перевизначено в дочірніх класах)"""
+        return {}
+
+    def get_all_bet_ranges(self) -> dict:
+        """Повертає всі діапазони ставок (може бути перевизначено в дочірніх класах)"""
+        return self.get_bet_ranges()
+
+    def validate_bet(self, bet_amount: float, mode_name: str = "base") -> dict:
+        """Базова валідація ставки (може бути перевизначено в дочірніх класах)"""
+        result = {
+            "is_valid": False,
+            "error_message": "",
+            "suggested_bet": 0.0
+        }
+        
+        # Перевіряємо глобальні обмеження
+        if bet_amount < self.min_denomination:
+            result["error_message"] = f"Ставка {bet_amount} менша за глобальний мінімум: {self.min_denomination}"
+            result["suggested_bet"] = self.min_denomination
+            return result
+        
+        if bet_amount > self.max_denomination:
+            result["error_message"] = f"Ставка {bet_amount} більша за глобальний максимум: {self.max_denomination}"
+            result["suggested_bet"] = self.max_denomination
+            return result
+        
+        # Базова валідація пройшла
+        result["is_valid"] = True
+        return result

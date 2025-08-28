@@ -20,6 +20,10 @@ def create_books(
     profiling: bool,
 ):
     """Main run-function for simulating game outcomes and outputting all files."""
+    # print(f"DEBUG: create_books START - num_sim_args: {num_sim_args}")
+    # print(f"DEBUG: create_books - gamestate: {gamestate}")
+    # print(f"DEBUG: create_books - config: {config}")
+    
     for key, ns in num_sim_args.items():
         if all([ns > 0, ns > batch_size * batch_size]):
             assert (
@@ -35,9 +39,23 @@ def create_books(
 
     startTime = time.time()
     print("\nCreating books...")
+    # print(f"DEBUG: create_books - About to start loop with num_sim_args: {num_sim_args}")
     for betmode_name in num_sim_args:
+        # print(f"DEBUG: create_books - Processing betmode: {betmode_name}")
         if num_sim_args[betmode_name] > 0:
+            # print(f"DEBUG: create_books - Setting gamestate.betmode = {betmode_name}")
             gamestate.betmode = betmode_name
+            # print(f"DEBUG: create_books - gamestate.betmode is now: {betmode_name}")
+            
+            # CRITICAL: Clear book events before each new betmode to prevent cross-contamination
+            # This prevents finalWin events from previous modes (like Horny_Jail) appearing in new modes
+            if hasattr(gamestate, 'book') and hasattr(gamestate.book, 'events'):
+                gamestate.book.events = []
+            
+            # CRITICAL: Reset sim counter for each betmode to start from id: 1
+            #  gamestate.reset_seed(0)
+            
+            # print(f"DEBUG: create_books - About to call run_multi_process_sims for {betmode_name}")
             run_multi_process_sims(
                 threads,
                 batch_size,
@@ -70,7 +88,7 @@ def get_sim_splits(gamestate: object, num_sims: int, betmode_name: str) -> Dict[
     reduce_sims = total_sims > num_sims
     listedCriteria = [d._criteria for d in betmode_distributions]
     criteria_weights = [d._quota for d in betmode_distributions]
-    random.seed(0)
+    # random.seed(0)
     while sum(num_sims_criteria.values()) != num_sims:
         c = random.choices(listedCriteria, criteria_weights)[0]
         if reduce_sims and num_sims_criteria[c] > 1:
