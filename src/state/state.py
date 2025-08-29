@@ -218,7 +218,9 @@ class GeneralGameState(ABC):
                 # because final_win might only contain base game win, not total
                 basewin = round(min(self.win_manager.basegame_wins, self.config.wincap), 2)
                 freewin = round(min(self.win_manager.freegame_wins, self.config.wincap), 2)
-                final = basewin + freewin  # Total from win_manager
+                # final = basewin + freewin  # Total from win_manager
+                final = round(min(self.win_manager.running_bet_win, self.config.wincap), 2)
+                # print(54321, final)
             else:
                 # Other bonus games: use final_win as is
                 final = self.final_win

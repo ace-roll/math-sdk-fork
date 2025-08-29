@@ -1,5 +1,6 @@
 """Game logic and event emission for Bonk Boi multiplier game with bonus games."""
 
+from operator import rshift
 from game_override import GameStateOverride
 from game_calculations import GameCalculations
 from game_events import BonkBoiEvents, reveal_event_bonk_boi
@@ -243,6 +244,7 @@ class GameState(GameStateOverride):
                 # Save the total bonus win before ending the game (since end_bonus_game resets it to 0)
                 total_bonus_win = self.total_bonus_win
                 self.end_bonus_game()
+                print("here3")
                 
                 # Check if maxwin was reached in buy bonus mode
                 if hasattr(self, 'final_win') and self.final_win > 0:
@@ -325,7 +327,7 @@ class GameState(GameStateOverride):
                 # Board already created with Bonus_Hunt reel set above
                 # Process spin using same logic as base game
                 reels = self.get_board_symbols()
-                
+                print("here5")
                 # CRITICAL: Calculate base game win for Bonus_Hunt mode from first spin symbols
                 try:
                     if len(reels) >= 2:
@@ -499,6 +501,7 @@ class GameState(GameStateOverride):
                         pass
                     elif self.events.bonus_state:
                         # End bonus game and add summary
+                        print("here2")
                         self.end_bonus_game()
                     
                     # CRITICAL: Reset reel set back to Bonus_Hunt after bonus ends
@@ -507,17 +510,24 @@ class GameState(GameStateOverride):
                     # Set result to preserved total bonus win for Bonus_Hunt mode
                     self.result = final_total_bonus_win
                     
-                    # CRITICAL: Skip win manager update here to prevent double counting
-                    # Win manager is already updated in end_bonus_game()
+                    # # CRITICAL: Skip win manager update here to prevent double counting
+                    # # Win manager is already updated in end_bonus_game()
                     # self.win_manager.reset_spin_win()
                     # self.win_manager.update_spinwin(final_total_bonus_win)
                     # self.win_manager.update_gametype_wins(self.config.freegame_type)
                     
+                    self.win_manager.reset_spin_win()
+                    self.win_manager.update_spinwin(self.base_game_win_for_bonus_hunt)
+                    self.win_manager.update_gametype_wins(self.config.freegame_type)
                     # Set gametype to free for bonus
                     self.gametype = self.config.freegame_type
                     
                     # Update final win to ensure freegame_wins is properly recorded
                     self.update_final_win()
+                    
+                    # CRITICAL: Call evaluate_finalwin() to create finalWin event for Bonus_Hunt mode
+                    # This ensures payoutMultiplier is set before finalWin.amount is calculated
+                    self.evaluate_finalwin()
                     
                     # Skip normal base game processing since we handled bonus
                     continue
@@ -566,6 +576,7 @@ class GameState(GameStateOverride):
                     # First, attribute the base spin's win to baseGameWins as multiplier units
                     bet_amount = self.get_current_betmode().get_cost()
                     result_multiplier_for_base = result / bet_amount if bet_amount > 0 else 0
+                    print(124, result_multiplier_for_base, result, bet_amount)
                     
                     self.win_manager.reset_spin_win()
                     self.win_manager.update_spinwin(result_multiplier_for_base)
@@ -695,6 +706,7 @@ class GameState(GameStateOverride):
                         pass
                     elif self.events.bonus_state:
                         # End bonus game and add summary
+                        print("here1")
                         self.end_bonus_game()
                     
                     # CRITICAL: Reset reel set back to base game after bonus ends
@@ -717,6 +729,10 @@ class GameState(GameStateOverride):
                     
                     # Update final win to ensure both basegame_wins and freegame_wins are properly recorded
                     self.update_final_win()
+                    
+                    # CRITICAL: Call evaluate_finalwin() to create finalWin event for base game with bonus
+                    # This ensures payoutMultiplier is set before finalWin.amount is calculated
+                    self.evaluate_finalwin()
                     
                     # Skip normal base game processing since we handled bonus
                     continue
@@ -951,9 +967,8 @@ class GameState(GameStateOverride):
                 
                 # Встановлюємо win_manager значення для правильного finalWin event
                 self.win_manager.freegame_wins = float(summary["total_win"])
-                self.win_manager.basegame_wins = 0.0
-                
-
+                self.win_manager.basegame_wins = 0
+                print(summary)
                 
                 # CRITICAL: Ensure running_bet_win matches the sum of base and free game wins
                 # This prevents the "Base + Free game payout mismatch!" error
