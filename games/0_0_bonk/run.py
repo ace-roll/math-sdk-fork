@@ -91,27 +91,25 @@ if __name__ == "__main__":
     # Parameters for maximum speed 100M simulations
     num_threads = 10
     rust_threads = 10
-    batching_size = 500_000
+    batching_size = 100_000
     compression = False
     profiling = False
 
     num_sim_args = {
-        "base": int(100_000),  # Тестуємо базовий режим
-        "bonus_hunt": int(100_000),  # Ідентичний до base, але з Bonus_Hunt.csv та cost 1.5
-        "Horny_Jail": int(100_000),  # Спеціальний режим з замороженим першим барабаном на 1000
-        "bonus1": int(10),  # Bonus game 1 (BONK_SPINS)
-        "bonus2": int(10),  # Bonus game 2 (SUPER_BONK_SPINS)
-        "buy_bonk_spins": int(100_000),
-        "buy_super_bonk_spins": int(100_000),  # Тестуємо новий режим
+        "base": int(10_000),
+        "bonus_hunt": int(10_000),
+        "Horny_Jail": int(10_000),   
+        "buy_bonk_spins": int(10_000),
+        "buy_super_bonk_spins": int(10_000),
     }
-
+ 
     run_conditions = {
         "run_sims": True,
         "run_optimization": False,
         "run_analysis": False,
         "upload_data": False,
     }
-    target_modes = ["base", "bonus_hunt", "Horny_Jail", "bonus1", "bonus2", "buy_bonk_spins", "buy_super_bonk_spins"]
+    target_modes = ["base", "bonus_hunt", "Horny_Jail", "buy_bonk_spins", "buy_super_bonk_spins"]
 
     print("🚀 Launching optimized 10M simulation")
     print(f"📊 Parameters:")

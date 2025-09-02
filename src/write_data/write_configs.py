@@ -71,7 +71,8 @@ def pass_fe_betmode(betmode, config=None):
     mode_info["max_win"] = betmode.get_wincap()
     
     # Додаємо обмеження ставок якщо config має bet_ranges
-    if config and hasattr(config, 'bet_ranges'):
+    if (config and hasattr(config, 'bet_ranges') and config.bet_ranges and 
+        hasattr(config, 'min_denomination') and config.min_denomination):
         mode_name = betmode.get_name()
         if mode_name in config.bet_ranges:
             bet_range = config.bet_ranges[mode_name]
@@ -260,7 +261,9 @@ def make_fe_config(gamestate, json_padding=True, assign_properties=True, **kwarg
         json_info["betModes"][m_name] = bm_info[m_name]
     
     # Додаємо глобальні обмеження ставок
-    if hasattr(gamestate.config, 'max_denomination'):
+    if (hasattr(gamestate.config, 'max_denomination') and gamestate.config.max_denomination and 
+        hasattr(gamestate.config, 'bet_ranges') and gamestate.config.bet_ranges and
+        hasattr(gamestate.config, 'min_denomination') and gamestate.config.min_denomination):
         json_info["betLimits"] = {
             "minDenomination": gamestate.config.min_denomination,
             "maxDenomination": gamestate.config.max_denomination,
@@ -331,11 +334,12 @@ def make_be_config(gamestate):
         be_info["rtp"] = config.rtp * 100  # RGS expects RTP as a %
     else:
         be_info["rtp"] = config.rtp
-    be_info["betDenomination"] = int(config.min_denomination * 100 * 100)
-    be_info["minDenomination"] = int(config.min_denomination * 100)
+    if hasattr(config, 'min_denomination') and config.min_denomination:
+        be_info["betDenomination"] = int(config.min_denomination * 100 * 100)
+        be_info["minDenomination"] = int(config.min_denomination * 100)
     
     # Додаємо максимальну ставку
-    if hasattr(config, 'max_denomination'):
+    if (hasattr(config, 'max_denomination') and config.max_denomination):
         be_info["maxDenomination"] = int(config.max_denomination * 100)
     
     be_info["providerNumber"] = int(config.provider_number)
@@ -392,8 +396,9 @@ def make_be_config(gamestate):
         }
         be_info["bookShelfConfig"].append(dic)
 
-    # Додаємо діапазони ставок для режимів
-    if hasattr(config, 'bet_ranges'):
+    # Adding bid ranges for modes
+    if (hasattr(config, 'bet_ranges') and config.bet_ranges and 
+        hasattr(config, 'min_denomination') and config.min_denomination):
         be_info["betRanges"] = {}
         for mode_name, bet_range in config.bet_ranges.items():
             be_info["betRanges"][mode_name] = {

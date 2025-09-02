@@ -74,7 +74,7 @@ class GameState(GameStateOverride):
                 # Buy bonus mode - automatically trigger appropriate bonus type
                 if is_super_bonk:
                     bonus_type = "SUPER_BONK_SPINS"
-                    spins_count = 10  # SUPER_BONK_SPINS має 10 спінів
+                    spins_count = 10  # SUPER_BONK_SPINS has 10 spins
                     reel_set = "BON2"
                 else:
                     bonus_type = "BONK_SPINS"
@@ -82,7 +82,8 @@ class GameState(GameStateOverride):
                     reel_set = "BON1"
                 
                 self.events.trigger_bonus(bonus_type, spins_count)
-                self.add_bonus_event(bonus_type)
+                # For buy bonus mode, no base game win, so trigger_win = 0
+                self.add_bonus_event(bonus_type, 0)
                 
                 # Initialize bonus state for the new bonus round
                 if self.events.super_bonus_mode:
@@ -196,8 +197,8 @@ class GameState(GameStateOverride):
                         if self.total_bonus_win >= 1000000:
                             self.events.bonus_state["maxwin_reached"] = True
                             self.events.bonus_state["spins_left"] = 0
-                            # НЕ виходимо з циклу - дозволяємо завершити поточний спін
-                            # щоб створити bonus spin event з maxWinReached: true
+                            # DO NOT exit loop - allow current spin to complete
+                            # to create bonus spin event with maxWinReached: true
                         
                         # Check if bonus type was upgraded (only on the FIRST upgrade)
                         if (self.events.bonus_state["type"] == "SUPER_BONK_SPINS" and 
@@ -226,7 +227,7 @@ class GameState(GameStateOverride):
                     # Add bonus spin event to book
                     self.add_bonus_spin_event(reels, result, bonus_type)
                     
-                    # Check if we need to create BONUS_TRIGGER event for upgrade
+                    # Check if we need to create BONUS_TRIGGER event for upgrade (BUY BONUS MODE)
                     if self.needs_upgrade_bonus_trigger:
                         # Create upgrade BONUS_TRIGGER event
                         self.events.create_bonus_trigger_event(
@@ -244,12 +245,12 @@ class GameState(GameStateOverride):
                 # Save the total bonus win before ending the game (since end_bonus_game resets it to 0)
                 total_bonus_win = self.total_bonus_win
                 self.end_bonus_game()
-                print("here3")
+                # print("here3")
                 
                 # Check if maxwin was reached in buy bonus mode
                 if hasattr(self, 'final_win') and self.final_win > 0:
                     # Maxwin was reached - use final_win set in end_bonus_game
-                    # final_win вже встановлено в end_bonus_game як maxwinAmount (без * 100)
+                    # final_win already set in end_bonus_game as maxwinAmount (without * 100)
                     final_win_amount = self.final_win
                     freegame_wins_amount = final_win_amount  # FIXED: Use actual final_win, not hardcoded 1000000
                 else:
@@ -257,7 +258,7 @@ class GameState(GameStateOverride):
                     final_win_amount = total_bonus_win
                     freegame_wins_amount = total_bonus_win
                 
-                # Встановлюємо final_win для системи (без додаткового множення на 100)
+                # Set final_win for system (without additional multiplication by 100)
                 self.final_win = final_win_amount
                 
                 # For buy bonus mode, payoutMultiplier should be the total bonus win amount
@@ -327,7 +328,7 @@ class GameState(GameStateOverride):
                 # Board already created with Bonus_Hunt reel set above
                 # Process spin using same logic as base game
                 reels = self.get_board_symbols()
-                print("here5")
+                # print("here5")
                 # CRITICAL: Calculate base game win for Bonus_Hunt mode from first spin symbols
                 try:
                     if len(reels) >= 2:
@@ -400,6 +401,7 @@ class GameState(GameStateOverride):
                     self.events.trigger_bonus(bonus_type, spins_count)
                     
                     # Add bonus event to book
+                    # For bonus hunt mode, base_game_win_for_bonus_hunt will be used automatically
                     self.add_bonus_event(bonus_type)
                     
                     # CRITICAL: Set bonus game active and run bonus spins for Bonus_Hunt mode
@@ -501,7 +503,7 @@ class GameState(GameStateOverride):
                         pass
                     elif self.events.bonus_state:
                         # End bonus game and add summary
-                        print("here2")
+                        # print("here2")
                         self.end_bonus_game()
                     
                     # CRITICAL: Reset reel set back to Bonus_Hunt after bonus ends
@@ -576,7 +578,7 @@ class GameState(GameStateOverride):
                     # First, attribute the base spin's win to baseGameWins as multiplier units
                     bet_amount = self.get_current_betmode().get_cost()
                     result_multiplier_for_base = result / bet_amount if bet_amount > 0 else 0
-                    print(124, result_multiplier_for_base, result, bet_amount)
+                    # print(124, result_multiplier_for_base, result, bet_amount)
                     
                     self.win_manager.reset_spin_win()
                     self.win_manager.update_spinwin(result_multiplier_for_base)
@@ -601,7 +603,8 @@ class GameState(GameStateOverride):
                     self.events.trigger_bonus(bonus_type, spins_count)
                     
                     # Add bonus event to book
-                    self.add_bonus_event(bonus_type)
+                    # For base game mode, pass the actual base game win as trigger_win
+                    self.add_bonus_event(bonus_type, result)
                     
                     # CRITICAL: Set bonus game active and run bonus spins for base game
                     self.bonus_game_active = True
@@ -669,8 +672,8 @@ class GameState(GameStateOverride):
                         if self.total_bonus_win >= 1000000:
                             self.events.bonus_state["maxwin_reached"] = True
                             self.events.bonus_state["spins_left"] = 0
-                            # НЕ виходимо з циклу - дозволяємо завершити поточний спін
-                            # щоб створити bonus spin event з maxWinReached: true
+                            # DO NOT exit loop - allow current spin to complete
+                            # to create bonus spin event with maxWinReached: true
                         
                         # Add bonus spin event
                         self.add_bonus_spin_event(reels, current_spin_win, bonus_type)
@@ -706,7 +709,7 @@ class GameState(GameStateOverride):
                         pass
                     elif self.events.bonus_state:
                         # End bonus game and add summary
-                        print("here1")
+                        # print("here1")
                         self.end_bonus_game()
                     
                     # CRITICAL: Reset reel set back to base game after bonus ends
@@ -800,7 +803,7 @@ class GameState(GameStateOverride):
             reels.append(symbol)
         return reels
 
-    def add_bonus_event(self, bonus_type):
+    def add_bonus_event(self, bonus_type, trigger_win=0):
         """Add bonus trigger event to the book"""
         # Generate unique bonus session ID
         if not self.bonus_session_id:
@@ -839,12 +842,26 @@ class GameState(GameStateOverride):
             else:
                 spins_received = 10  # 1 Bonus symbol = 10 spins
 
+        # CRITICAL: Calculate proper trigger_win
+        # For bonus hunt mode, use base_game_win_for_bonus_hunt
+        # For base game mode, use provided trigger_win
+        # For buy bonus mode, use 0 (no base game win)
+        if hasattr(self, 'base_game_win_for_bonus_hunt'):
+            # Bonus hunt mode - use calculated base game win
+            actual_trigger_win = self.base_game_win_for_bonus_hunt
+        elif current_betmode and current_betmode.get_buybonus():
+            # Buy bonus mode - no base game win
+            actual_trigger_win = 0
+        else:
+            # Base game mode - use provided trigger_win
+            actual_trigger_win = trigger_win
+
         # Create bonus trigger event using new method
         self.events.create_bonus_trigger_event(
             self,
             bonus_type,
             trigger_symbols,
-            0,  # trigger_win = 0 for buy bonus
+            actual_trigger_win,  # Pass calculated trigger win
             spins_received
         )
 
@@ -926,9 +943,9 @@ class GameState(GameStateOverride):
             # Determine final multiplier based on bonus type
             bonus_type = summary["type"]
             if bonus_type == "SUPER_BONK_SPINS":
-                final_multiplier = 4  # SUPER_BONK_SPINS має множник x4
+                final_multiplier = 4  # SUPER_BONK_SPINS has x4 multiplier
             else:  # BONK_SPINS
-                final_multiplier = 2  # Звичайний BONK_SPINS має множник x2
+                final_multiplier = 2  # Regular BONK_SPINS has x2 multiplier
             
             # Check if maxwin was reached
             if summary.get("maxwin_reached", False):
@@ -936,11 +953,11 @@ class GameState(GameStateOverride):
                 self.create_maxwin_event(summary)
                 
                 # Set final_win and freegame_wins for maxwin case
-                # final_win буде використано системою для створення finalWin event
-                # НЕ множимо на 100 тут - система вже множить на 100 в final_win_event
-                self.final_win = summary["maxwin_amount"]  # 1,000,000 (без * 100)
+                # final_win will be used by system to create finalWin event
+                # DO NOT multiply by 100 here - system already multiplies by 100 in final_win_event
+                self.final_win = summary["maxwin_amount"]  # 1,000,000 (without * 100)
                 
-                # Встановлюємо win_manager значення для правильного finalWin event
+                # Set win_manager values for proper finalWin event
                 self.win_manager.freegame_wins = float(summary["maxwin_amount"])  # 1,000,000.0
                 self.win_manager.basegame_wins = 0.0
                 
@@ -965,10 +982,10 @@ class GameState(GameStateOverride):
                 # This ensures baseGameWins and freeGameWins are calculated correctly
                 self.final_win = summary["total_win"]
                 
-                # Встановлюємо win_manager значення для правильного finalWin event
+                # Set win_manager values for proper finalWin event
                 self.win_manager.freegame_wins = float(summary["total_win"])
                 self.win_manager.basegame_wins = 0
-                print(summary)
+                # print(summary)
                 
                 # CRITICAL: Ensure running_bet_win matches the sum of base and free game wins
                 # This prevents the "Base + Free game payout mismatch!" error
@@ -986,11 +1003,21 @@ class GameState(GameStateOverride):
 
     def create_maxwin_event(self, summary):
         """Create MAXWIN event when bonus game reaches 1,000,000 limit"""
+        # CRITICAL: Calculate proper sessionWin for maxwin event
+        # For bonus hunt mode, include base game win in sessionWin
+        if hasattr(self, 'base_game_win_for_bonus_hunt'):
+            # Bonus hunt mode - sessionWin = base game win + maxwin amount
+            session_win = self.base_game_win_for_bonus_hunt + summary["maxwin_amount"]
+        else:
+            # Regular mode - sessionWin = maxwin amount only
+            session_win = summary["maxwin_amount"]
+        
         event = {
             "index": len(self.book.events),
             "type": "maxwin",  # Custom event type for maxwin
             "bonusSessionId": self.bonus_session_id,
             "totalBonusWin": summary["maxwin_amount"],  # 1,000,000
+            "sessionWin": float(session_win),  # Add sessionWin field
             "spinsCompleted": self.bonus_spins_completed,
             "bonusType": summary["type"],
             "reason": "maxwin_limit",
@@ -1000,9 +1027,9 @@ class GameState(GameStateOverride):
         
         self.book.add_event(event)
         
-        # НЕ створюємо finalWin event тут - система створить його автоматично
-        # через evaluate_finalwin() → final_win_event()
-        # Нам потрібно тільки правильно встановити final_win та freegame_wins
+        # DO NOT create finalWin event here - system will create it automatically
+        # through evaluate_finalwin() → final_win_event()
+        # We only need to properly set final_win and freegame_wins
 
     def draw_board(self, emit_event: bool = True) -> None:
         """Override draw_board to use custom reveal event for Bonk Boi."""

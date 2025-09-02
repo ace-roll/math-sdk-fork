@@ -328,14 +328,14 @@ class BonkBoiEvents:
         
         # Define symbol values for different bonus types
         if bonus_type == "BONK_SPINS":
-            # BON1: Bat=0, Golden Bat=0 (не дають виграшу, тільки додаткові спіни)
+            # BON1: Bat=0, Golden Bat=0 (no win, only extra spins)
             bonus_symbols = {
                 "1": 1, "2": 2, "3": 3, "5": 5, "10": 10,
                 "25": 25, "50": 50, "100": 100, "250": 250,
                 "500": 500, "1000": 1000, "Bat": 0, "Golden Bat": 0
             }
         elif bonus_type == "SUPER_BONK_SPINS":
-            # BON2: Bat=0, Golden Bat=1 (Golden Bat дає виграш 1, але не додаткові спіни)
+            # BON2: Bat=0, Golden Bat=1 (Golden Bat gives win 1, but no extra spins)
             bonus_symbols = {
                 "1": 1, "2": 2, "3": 3, "5": 5, "10": 10,
                 "25": 25, "50": 50, "100": 100, "250": 250,
@@ -406,6 +406,16 @@ class BonkBoiEvents:
         else:
             reel_set = self.current_reel_set
         
+        # CRITICAL: Calculate proper trigger_win and sessionWin
+        # For buy bonus mode, trigger_win should be the base game win
+        # For regular bonus mode, trigger_win should be the win from the triggering spin
+        if hasattr(gamestate, 'base_game_win_for_bonus_hunt'):
+            # Bonus hunt mode - use calculated base game win
+            actual_trigger_win = gamestate.base_game_win_for_bonus_hunt
+        else:
+            # Regular mode - use provided trigger_win
+            actual_trigger_win = trigger_win
+        
         event = {
             "index": len(gamestate.book.events),
             "type": EventConstants.BONUS_TRIGGER.value,
@@ -414,8 +424,8 @@ class BonkBoiEvents:
             "bonusSessionId": bonus_session_id,
             "reelSet": reel_set,
             "triggerSymbols": trigger_symbols,
-            "triggerWin": trigger_win,
-            "sessionWin": 0.0,  # sessionWin = 0 for buy bonus mode
+            "triggerWin": actual_trigger_win,  # Use calculated trigger win
+            "sessionWin": float(actual_trigger_win),  # Convert to float for consistency
             "spinsReceived": spins_received,
             "spinsLeft": spins_received
         }
@@ -441,6 +451,15 @@ class BonkBoiEvents:
         else:
             actual_reel_set = reel_set
         
+        # CRITICAL: Calculate proper sessionWin
+        # For bonus hunt mode, include base game win in sessionWin
+        if hasattr(gamestate, 'base_game_win_for_bonus_hunt'):
+            # Bonus hunt mode - sessionWin = base game win + total bonus win
+            session_win = gamestate.base_game_win_for_bonus_hunt + total_bonus_win
+        else:
+            # Regular mode - sessionWin = total bonus win only
+            session_win = total_bonus_win
+        
         event = {
             "index": len(gamestate.book.events),
             "type": EventConstants.BONUS_SPIN.value,
@@ -449,6 +468,7 @@ class BonkBoiEvents:
             "reelSet": actual_reel_set,
             "spinWin": spin_win,
             "totalBonusWin": total_bonus_win,
+            "sessionWin": float(session_win),  # Add sessionWin field
             "spinsReceived": spins_received,
             "spinsLeft": spins_left,
             "gameType": gamestate.gametype
@@ -458,11 +478,21 @@ class BonkBoiEvents:
     def create_bonus_complete_event(self, gamestate, bonus_session_id, total_bonus_win, spins_completed, bonus_type, final_multiplier):
         """Create BONUS_COMPLETE event"""
         
+        # CRITICAL: Calculate proper sessionWin for final event
+        # For bonus hunt mode, include base game win in sessionWin
+        if hasattr(gamestate, 'base_game_win_for_bonus_hunt'):
+            # Bonus hunt mode - sessionWin = base game win + total bonus win
+            session_win = gamestate.base_game_win_for_bonus_hunt + total_bonus_win
+        else:
+            # Regular mode - sessionWin = total bonus win only
+            session_win = total_bonus_win
+        
         event = {
             "index": len(gamestate.book.events),
             "type": EventConstants.BONUS_COMPLETE.value,
             "bonusSessionId": bonus_session_id,
             "totalBonusWin": total_bonus_win,
+            "sessionWin": float(session_win),  # Add sessionWin field
             "spinsCompleted": spins_completed,
             "bonusType": bonus_type,
             "finalMultiplier": final_multiplier,
@@ -505,7 +535,7 @@ class BonkBoiEvents:
         symbol1 = reels[0]
         symbol2 = reels[1]
         
-        # Get numeric values - Bat and Golden Bat are always 0 (не дають виграшу)
+        # Get numeric values - Bat and Golden Bat are always 0 (no win)
         def get_symbol_value(symbol):
             if symbol == "Bat" or symbol == "Golden Bat":
                 return 1
@@ -526,7 +556,7 @@ class BonkBoiEvents:
     def get_symbol_value(self, symbol):
         """Get numeric value of symbol for SUPER_BONK_SPINS"""
         if symbol in ["Golden Bat", "Bat"]:
-            return 0  # Golden Bat та Bat = 0 в SUPER_BONK_SPINS (не дають виграшу)
+            return 0  # Golden Bat and Bat = 0 in SUPER_BONK_SPINS (no win)
         else:
             try:
                 return int(symbol)

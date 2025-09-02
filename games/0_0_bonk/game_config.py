@@ -23,14 +23,14 @@ class GameConfig(Config):
         self.num_reels = 2
         self.num_rows = [1, 1]  # 1 row per reel
         
-        # Win cap - максимальний виграш 10,000,000x (абсолютний максимум)
+        # Win cap - maximum win 10,000,000x (absolute maximum)
         self.wincap = 10000000.0
         
-        # Bet limits - обмеження для ставок
-        self.min_denomination = 0.1  # Мінімальна ставка 0.1
-        self.max_denomination = 10.0  # Максимальна ставка 10.0
+        # Bet limits - bet restrictions
+        self.min_denomination = 0.1  # Minimum bet 0.1
+        self.max_denomination = 10.0  # Maximum bet 10.0
         
-        # Bet ranges для кожного режиму (множники від базової ставки)
+        # Bet ranges for each mode (multipliers from base bet)
         self.bet_ranges = {
             "base": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 10.0
             "bonus_hunt": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 5.0
@@ -39,7 +39,7 @@ class GameConfig(Config):
             "buy_super_bonk_spins": {"min_multiplier": 1, "max_multiplier": 100},  # 0.1 - 1.0
         }
         
-        # Paytable - multiplier values (правильні мультиплікатори)
+        # Paytable - multiplier values (correct multipliers)
         self.paytable = {
             (1, "1"): 1,
             (1, "2"): 2,
@@ -69,7 +69,7 @@ class GameConfig(Config):
                 name="base",
                 cost=1.0,
                 rtp=0.96,
-                max_win=1000000.0,  # Максимальний виграш 5000x (обмежує BR0 барабани)
+                max_win=1000000.0,
                 auto_close_disabled=False,
                 is_feature=False,
                 is_buybonus=False,
@@ -90,7 +90,7 @@ class GameConfig(Config):
                 name="bonus_hunt",
                 cost=3.0,
                 rtp=0.96,
-                max_win=1000000.0,  # Максимальний виграш 1,000,000x (обмежує Bonus_Hunt барабани)
+                max_win=1000000.0,
                 auto_close_disabled=False,
                 is_feature=False,
                 is_buybonus=False,
@@ -102,16 +102,16 @@ class GameConfig(Config):
                         conditions={
                             "reel_weights": {self.basegame_type: {"Bonus_Hunt": 1}},
                             "force_wincap": False,
-                            "force_freegame": False,  # НЕ запускати фрігейми
+                            "force_freegame": False,
                         }
                     )
                 ]
             ),
             BetMode(
                 name="Horny_Jail",
-                cost=20000.0,  # Вартість 20000
+                cost=20000.0,
                 rtp=0.96,
-                max_win=1000000.0,  # Максимальний виграш 1,000,000x (1000 × 1000)
+                max_win=1000000.0,
                 auto_close_disabled=False,
                 is_feature=False,
                 is_buybonus=False,
@@ -134,10 +134,10 @@ class GameConfig(Config):
                 name="buy_bonk_spins",
                 cost=40.0,
                 rtp=0.96,
-                max_win=1000000.0,  # Максимальний виграш 1,000,000x (обмежує BON1 барабани)
+                max_win=1000000.0,
                 auto_close_disabled=False,
                 is_feature=True,
-                is_buybonus=True,  # Це режим покупки бонусу
+                is_buybonus=True,
                 distributions=[
                     Distribution(
                         criteria="buy_bonk_spins",
@@ -146,19 +146,19 @@ class GameConfig(Config):
                         conditions={
                             "reel_weights": {self.basegame_type: {"BON1": 1}, self.freegame_type: {"BON1": 1}},
                             "force_wincap": False,
-                            "force_freegame": True,  # Примусово запускає бонусну гру
+                            "force_freegame": True,
                         }
                     )
                 ]
             ),
             BetMode(
                 name="buy_super_bonk_spins",
-                cost=200.0,  # Вища вартість для супер-бонусу
+                cost=200.0,
                 rtp=0.96,
-                max_win=1000000.0,  # Максимальний виграш 1,000,000x (обмежує BON2 барабани)
+                max_win=1000000.0,
                 auto_close_disabled=False,
                 is_feature=True,
-                is_buybonus=True,  # Режим покупки бонусу
+                is_buybonus=True,
                 distributions=[
                     Distribution(
                         criteria="buy_super_bonk_spins",
@@ -167,7 +167,7 @@ class GameConfig(Config):
                         conditions={
                             "reel_weights": {self.basegame_type: {"BON2": 1}, self.freegame_type: {"BON2": 1}},
                             "force_wincap": False,
-                            "force_freegame": True,  # Примусово запускає бонусну гру
+                            "force_freegame": True,
                         }
                     )
                 ]
@@ -255,14 +255,14 @@ class GameConfig(Config):
 
     def validate_bet(self, bet_amount: float, mode_name: str = "base") -> dict:
         """
-        Валідує ставку для конкретного режиму гри
+        Validates bet for specific game mode
         
         Args:
-            bet_amount: Розмір ставки
-            mode_name: Назва режиму гри
+            bet_amount: Bet amount
+            mode_name: Game mode name
             
         Returns:
-            dict: Результат валідації з деталями
+            dict: Validation result with details
         """
         result = {
             "is_valid": False,
@@ -272,36 +272,36 @@ class GameConfig(Config):
             "suggested_bet": 0.0
         }
         
-        # Перевіряємо чи існує режим
+        # Check if mode exists
         if mode_name not in self.bet_ranges:
             result["error_message"] = f"Невідомий режим гри: {mode_name}"
             return result
         
-        # Отримуємо діапазон ставок для режиму
+        # Get bet range for mode
         bet_range = self.bet_ranges[mode_name]
         min_multiplier = bet_range["min_multiplier"]
         max_multiplier = bet_range["max_multiplier"]
         
-        # Розраховуємо дозволені ставки
+        # Calculate allowed bets
         min_allowed = self.min_denomination * min_multiplier
         max_allowed = self.min_denomination * max_multiplier
         
         result["min_allowed"] = min_allowed
         result["max_allowed"] = max_allowed
         
-        # Перевіряємо мінімальну ставку
+        # Check minimum bet
         if bet_amount < min_allowed:
             result["error_message"] = f"Ставка {bet_amount} занадто мала. Мінімум: {min_allowed}"
             result["suggested_bet"] = min_allowed
             return result
         
-        # Перевіряємо максимальну ставку
+        # Check maximum bet
         if bet_amount > max_allowed:
             result["error_message"] = f"Ставка {bet_amount} занадто велика. Максимум: {max_allowed}"
             result["suggested_bet"] = max_allowed
             return result
         
-        # Перевіряємо глобальні обмеження
+        # Check global restrictions
         if bet_amount < self.min_denomination:
             result["error_message"] = f"Ставка {bet_amount} менша за глобальний мінімум: {self.min_denomination}"
             result["suggested_bet"] = self.min_denomination
@@ -312,22 +312,22 @@ class GameConfig(Config):
             result["suggested_bet"] = self.max_denomination
             return result
         
-        # Ставка валідна
+        # Bet is valid
         result["is_valid"] = True
         return result
     
     def get_bet_range(self, mode_name: str = "base") -> dict:
         """
-        Повертає діапазон ставок для конкретного режиму
+        Returns bet range for specific mode
         
         Args:
-            mode_name: Назва режиму гри
+            mode_name: Game mode name
             
         Returns:
-            dict: Діапазон ставок
+            dict: Bet range
         """
         if mode_name not in self.bet_ranges:
-            return {"min": 0.0, "max": 0.0, "error": f"Невідомий режим: {mode_name}"}
+            return {"min": 0.0, "max": 0.0, "error": f"Unknown mode: {mode_name}"}
         
         bet_range = self.bet_ranges[mode_name]
         return {
@@ -339,14 +339,20 @@ class GameConfig(Config):
     
     def get_all_bet_ranges(self) -> dict:
         """
-        Повертає всі діапазони ставок для всіх режимів
+        Returns all bet ranges for all modes
         
         Returns:
-            dict: Всі діапазони ставок
+            dict: All bet ranges
         """
         all_ranges = {}
         for mode_name in self.bet_ranges:
-            all_ranges[mode_name] = self.get_bet_range(mode_name)
+            bet_range = self.bet_ranges[mode_name]
+            all_ranges[mode_name] = {
+                "min": self.min_denomination * bet_range["min_multiplier"],
+                "max": self.min_denomination * bet_range["max_multiplier"],
+                "min_multiplier": bet_range["min_multiplier"],
+                "max_multiplier": bet_range["max_multiplier"]
+            }
         return all_ranges
 
     def read_single_column_csv(self, file_path):
