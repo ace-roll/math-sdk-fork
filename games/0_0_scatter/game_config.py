@@ -2,7 +2,6 @@ import os
 from src.config.config import Config
 from src.config.distributions import Distribution
 from src.config.betmode import BetMode
-from src.config.paths import PROJECT_PATH
 
 
 class GameConfig(Config):
@@ -16,7 +15,6 @@ class GameConfig(Config):
         return cls._instance
 
     def __init__(self):
-        os.chdir(PROJECT_PATH)
         super().__init__()
         self.game_id = "0_0_scatter"
         self.game_name = "sample_scatter"
@@ -29,7 +27,8 @@ class GameConfig(Config):
 
         # Game Dimensions
         self.num_reels = 6
-        self.num_rows = [5] * self.num_reels  # Optionally include variable number of rows per reel
+        # Optionally include variable number of rows per reel
+        self.num_rows = [5] * self.num_reels
         # Board and Symbol Properties
         t1, t2, t3, t4 = (8, 8), (9, 10), (11, 13), (14, 36)
         pay_group = {
@@ -119,17 +118,17 @@ class GameConfig(Config):
                     Distribution(
                         criteria="wincap",
                         quota=0.001,
-                        # win_criteria=self.wincap,
+                        win_criteria=self.wincap,
                         conditions={
                             "reel_weights": {
                                 self.basegame_type: {"BR0": 1},
                                 self.freegame_type: {"FR0": 1},
                             },
                             "mult_values": {
-                                self.basegame_type: {2: 100, 4: 80, 5: 50, 7: 20, 10: 10},
-                                self.freegame_type: {2: 100, 4: 80, 5: 50, 7: 20, 10: 10},
+                                self.basegame_type: {10: 10},
+                                self.freegame_type: {10: 10},
                             },
-                            "scatter_triggers": {4: 1, 5: 2},
+                            "scatter_triggers": {5: 2},
                             "force_wincap": True,
                             "force_freegame": True,
                         },
@@ -189,24 +188,24 @@ class GameConfig(Config):
                     Distribution(
                         criteria="wincap",
                         quota=0.001,
-                        # win_criteria=self.wincap,
+                        win_criteria=self.wincap,
                         conditions={
                             "reel_weights": {
                                 self.basegame_type: {"BR0": 1},
                                 self.freegame_type: {"FR0": 1},
                             },
                             "mult_values": {
-                                self.basegame_type: {2: 100, 4: 80, 5: 50, 7: 20, 10: 10},
-                                self.freegame_type: {2: 100, 4: 80, 5: 50, 7: 20, 10: 10},
+                                self.basegame_type: {10: 10},
+                                self.freegame_type: {10: 10},
                             },
-                            "scatter_triggers": {4: 10, 5: 5, 6: 1},
+                            "scatter_triggers": {6: 1},
                             "force_wincap": True,
                             "force_freegame": True,
                         },
                     ),
                     Distribution(
                         criteria="freegame",
-                        quota=0.1,
+                        quota=0.999,
                         conditions={
                             "reel_weights": {
                                 self.basegame_type: {"BR0": 1},
