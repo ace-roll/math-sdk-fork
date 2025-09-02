@@ -30,3 +30,8 @@ class EventConstants(Enum):
 
     # Special symbol events
     UPDATE_GLOBAL_MULT = "updateGlobalMult"
+
+    # Bonk Boi specific events
+    BONUS_TRIGGER = "BONUS_TRIGGER"
+    BONUS_SPIN = "BONUS_SPIN"
+    BONUS_COMPLETE = "BONUS_COMPLETE"

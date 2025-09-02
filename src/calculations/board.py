@@ -74,6 +74,14 @@ class Board(GeneralGameState):
         if self.config.include_padding:
             self.top_symbols = top_symbols
             self.bottom_symbols = bottom_symbols
+        
+        # Відстежуємо спін після створення дошки
+        if hasattr(self, 'increment_spin_count'):
+            # Визначаємо тип спіну на основі поточного gametype
+            if hasattr(self, 'gametype') and self.gametype == self.config.freegame_type:
+                self.increment_spin_count("free")
+            else:
+                self.increment_spin_count("base")
 
     def force_board_from_reelstrips(self, reelstrip_id: str, force_stop_positions: List[List]) -> None:
         """Creates a gameboard from specified stopping positions."""
@@ -140,6 +148,14 @@ class Board(GeneralGameState):
         if self.config.include_padding:
             self.top_symbols = top_symbols
             self.bottom_symbols = bottom_symbols
+        
+        # Відстежуємо спін після створення дошки
+        if hasattr(self, 'increment_spin_count'):
+            # Визначаємо тип спіну на основі поточного gametype
+            if hasattr(self, 'gametype') and self.gametype == self.config.freegame_type:
+                self.increment_spin_count("free")
+            else:
+                self.increment_spin_count("base")
 
     def create_symbol(self, name: str) -> object:
         """Create a new symbol and assign relevant attributes."""
@@ -214,6 +230,14 @@ class Board(GeneralGameState):
             self.create_board_reelstrips()
         if emit_event:
             reveal_event(self)
+        
+        # Відстежуємо спін після створення дошки
+        if hasattr(self, 'increment_spin_count'):
+            # Визначаємо тип спіну на основі поточного gametype
+            if hasattr(self, 'gametype') and self.gametype == self.config.freegame_type:
+                self.increment_spin_count("free")
+            else:
+                self.increment_spin_count("base")
 
     def force_special_board(self, force_criteria: str, num_force_syms: int) -> None:
         """Force a board to have a specified number of symbols.

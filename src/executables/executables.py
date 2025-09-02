@@ -89,6 +89,10 @@ class Executables(Conditions, Tumble):
         self.fs += 1
         self.win_manager.reset_spin_win()
         self.win_data = {}
+        
+        # Відстежуємо фріспін
+        if hasattr(self, 'increment_spin_count'):
+            self.increment_spin_count("free")
 
     def end_freespin(self) -> None:
         """Transmit total amount awarded during freegame."""

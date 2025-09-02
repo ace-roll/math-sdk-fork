@@ -7,7 +7,12 @@ import os
 import hashlib
 import json
 import ast
-import zstandard as zstd
+# Conditional import for zstandard
+try:
+    import zstandard as zstd
+    ZSTD_AVAILABLE = True
+except ImportError:
+    ZSTD_AVAILABLE = False
 
 
 def get_sha_256(file_to_hash: str):
@@ -143,8 +148,11 @@ def output_lookup_and_force_files(
                 gamestate.output_files.get_temp_multi_thread_name(betmode, thread, repeat_index, compress)
             )
 
-    if compress:
+
+    if compress and ZSTD_AVAILABLE:
         # Write a temporary file
+    if compress:
+
         temp_book_output_path = os.path.join(gamestate.output_files.book_path, "temp_book_output.json")
         with open(temp_book_output_path, "w", encoding="UTF-8") as outfile:
             for fname in file_list:
@@ -157,7 +165,8 @@ def output_lookup_and_force_files(
             f_out.write(zstd.ZstdCompressor().compress(f_in.read()))
 
         os.remove(temp_book_output_path)
-    else:
+    elif compress and not ZSTD_AVAILABLE:
+        print("Warning: zstandard not available, falling back to uncompressed output")
         with open(
             gamestate.output_files.get_final_book_name(betmode, False),
             "w",
@@ -166,6 +175,26 @@ def output_lookup_and_force_files(
             for filename in file_list:
                 with open(filename, "r", encoding="UTF-8") as infile:
                     outfile.write(infile.read())
+    else:
+        with open(
+            gamestate.output_files.get_final_book_name(betmode, False),
+            "w",
+            encoding="UTF-8",
+        ) as outfile:
+            for id, filename in enumerate(file_list):
+                with open(filename, "r", encoding="UTF-8") as infile:
+                    file_data = infile.read()
+                    if filename.endswith(".jsonl"):
+                        outfile.write(file_data)
+                    elif filename.endswith(".json"):
+                        if id == 0 and len(file_list) == 1:
+                            outfile.write(file_data)
+                        elif id == 0 and len(file_list) > 1:
+                            outfile.write(file_data[:-1])  # don't write final ']'
+                        elif id != len(file_list) - 1:
+                            outfile.write("," + file_data[1:-1])  # don't write first or last '[/]'
+                        else:
+                            outfile.write("," + file_data[1::])  # dont write first '[', write last ']'
 
     print("Saving force files for", game_id, "in", betmode)
     force_results_dict = {}
@@ -253,7 +282,14 @@ def output_lookup_and_force_files(
 
 def write_json(gamestate, filename: str):
     """Convert the list of dictionaries to a JSON-encoded string and compress it in chunks."""
-    json_objects = [json.dumps(item) for item in gamestate.library.values()]
+    # Convert Symbol objects to strings before JSON serialization
+    json_objects = []
+    for item in gamestate.library.values():
+        if hasattr(item, 'name'):  # If it's a Symbol object
+            json_objects.append(json.dumps({"name": item.name}))
+        else:
+            json_objects.append(json.dumps(item))
+    
     combined_data = "\n".join(json_objects) + "\n"
 
     if filename.endswith(".zst"):
@@ -263,7 +299,11 @@ def write_json(gamestate, filename: str):
             f.write(compressed_data)
     else:
         with open(filename, "w", encoding="UTF-8") as f:
-            f.write(combined_data)
+            if not (gamestate.config.output_regular_json):
+                f.write(combined_data)
+            else:
+                j_regular = [item for item in gamestate.library.values()]
+                f.write(json.dumps(j_regular))
 
 
 def print_recorded_wins(gamestate: object, name: str = ""):
