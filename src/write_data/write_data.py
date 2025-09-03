@@ -150,6 +150,7 @@ def output_lookup_and_force_files(
 
 
     if compress and ZSTD_AVAILABLE:
+        pass
         # Write a temporary file
     if compress:
 
